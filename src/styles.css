@@ -276,3 +276,6 @@ p.tile-rules { margin: 0.5rem 0 0; }
 .icon { width: 14px; height: 14px; display: block; flex-shrink: 0; }
 .round-btn .icon { width: 13px; height: 13px; }
 .enemy-row .row.gap button .icon { width: 16px; height: 16px; }
+/* Help popups always use the text font, even when the "?" sits inside a heading */
+.help-pop { font-family: var(--font-body); font-size: 0.95rem; font-weight: normal; line-height: 1.45; letter-spacing: normal; text-transform: none; }
+.help-pop strong { font-weight: 700; }
