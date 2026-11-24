@@ -18,7 +18,8 @@ export function GamePage() {
   const [game, setGame] = useState<SavedGame | null | undefined>(undefined);
   const [tab, setTab] = useState<Tab>('enemies');
   const [openUnit, setOpenUnit] = useState<string | null>(null);
-  const [openTile, setOpenTile] = useState<string | null>(null);
+  // Tile extra rules are shown by default; this holds the tiles the players collapsed.
+  const [collapsedTiles, setCollapsedTiles] = useState<string[]>([]);
 
   useEffect(() => {
     repos.games.get(id!).then((g) => setGame(g ?? null));
@@ -185,7 +186,7 @@ export function GamePage() {
           {sortTiles(s.tilesInPlay).map((tid) => {
             const t = cat.tiles.find((x) => x.id === tid);
             const rules = t?.rules?.trim();
-            const open = openTile === tid;
+            const open = !collapsedTiles.includes(tid);
             return (
               <li key={tid} className="card tile-row">
                 <div className="row between">
@@ -197,7 +198,7 @@ export function GamePage() {
                     ) : null}
                   </div>
                   {rules && (
-                    <button className="small" aria-expanded={open} onClick={() => setOpenTile(open ? null : tid)}>
+                    <button className="small" aria-expanded={open} onClick={() => setCollapsedTiles(open ? [...collapsedTiles, tid] : collapsedTiles.filter((x) => x !== tid))}>
                       Extra rules {open ? '▴' : '▾'}
                     </button>
                   )}
