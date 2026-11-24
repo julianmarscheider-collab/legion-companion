@@ -30,7 +30,7 @@ export async function seedSampleData(ownerId: string) {
   });
   const units = [goblin, archer, troll, king];
 
-  const tile = (code: string, name: string, markers: MapTile['markers'], rules = ''): MapTile => ({ ...e(), code, name, description: '', photos: [], markers, rules });
+  const tile = (code: string, name: string, markers: MapTile['markers'], rules = ''): MapTile => ({ ...e(), code, name, collection: 'Goblin Caves', description: '', photos: [], markers, rules });
   const tiles = [
     tile('1', 'Entrance Hall', [{ label: 'A', type: 'Door' }]),
     tile('2', 'Guard Room', [{ label: 'A', type: 'Chest' }]),

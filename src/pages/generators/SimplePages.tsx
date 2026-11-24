@@ -222,6 +222,7 @@ export function MissionsPage() {
 
 function MapTileEditor({ value: t, onChange }: EditorProps<MapTile>) {
   const markerTypes = useMarkerTypes();
+  const collections = collectionsOf(useCollection(repos.mapTiles));
   const setMarker = (i: number, patch: Partial<MapTile['markers'][number]>) =>
     onChange({ ...t, markers: t.markers.map((m, j) => (j === i ? { ...m, ...patch } : m)) });
   return (
@@ -230,6 +231,7 @@ function MapTileEditor({ value: t, onChange }: EditorProps<MapTile>) {
         <TextField label="Tile number / code" help="tileCode" value={t.code} onChange={(code) => onChange({ ...t, code })} placeholder="As printed on the tile" />
         <TextField label="Name" value={t.name} onChange={(name) => onChange({ ...t, name })} />
       </div>
+      <TextField label="Collection" help="tileCollection" suggestions={collections} value={t.collection ?? ''} onChange={(collection) => onChange({ ...t, collection })} placeholder="e.g. Dungeon Core Set" />
       <PhotoField photos={t.photos} onChange={(photos) => onChange({ ...t, photos })} />
       <fieldset>
         <legend>
@@ -255,15 +257,19 @@ export function MapTilesPage() {
     <CrudPage
       title="Map tiles"
       intro="Your physical map tiles and the location markers printed on them."
+      groups={{ label: 'collection', get: (t) => t.collection ?? '', emptyLabel: 'No collection' }}
       repo={repos.mapTiles}
-      create={(o) => ({ ...newEntity(o), name: '', code: '', description: '', photos: [], markers: [], rules: '' })}
+      create={(o) => ({ ...newEntity(o), name: '', code: '', collection: '', description: '', photos: [], markers: [], rules: '' })}
       Editor={MapTileEditor}
       summary={(t) => (
         <div className="row gap">
           <TileThumb tile={t} zoom={false} />
           <div>
             <strong>Tile {t.code} – {t.name}</strong><br />
-            <small className="muted">{t.markers.map((m) => `${m.label}: ${m.type}`).join(', ') || 'No markers'}</small>
+            <small className="muted unit-meta">
+              {t.collection && <i className="faction">{t.collection}</i>}
+              <span>{t.markers.map((m) => `${m.label}: ${m.type}`).join(', ') || 'No markers'}</span>
+            </small>
           </div>
         </div>
       )}
@@ -272,6 +278,11 @@ export function MapTilesPage() {
 }
 
 // ---- Map sets ---------------------------------------------------------------
+
+/** All collection names used by these tiles, sorted. */
+function collectionsOf(tiles: MapTile[]): string[] {
+  return [...new Set(tiles.map((t) => (t.collection ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
 
 function MapSetEditor({ value: s, onChange }: EditorProps<MapSet>) {
   const tiles = useCollection(repos.mapTiles);
@@ -289,6 +300,25 @@ function MapSetEditor({ value: s, onChange }: EditorProps<MapSet>) {
         onChange={(tileIds) => onChange({ ...s, tileIds, startTileId: tileIds.includes(s.startTileId) ? s.startTileId : (tileIds[0] ?? '') })}
         noItemsText="Create map tiles first."
       />
+      {collectionsOf(tiles).length > 0 && (
+        <select
+          className="add-enemy"
+          value=""
+          aria-label="Add all tiles of a collection"
+          onChange={(e) => {
+            const add = tiles.filter((t) => (t.collection ?? '').trim() === e.target.value && !s.tileIds.includes(t.id));
+            const tileIds = [...s.tileIds, ...add.map((t) => t.id)];
+            onChange({ ...s, tileIds, startTileId: s.startTileId || (tileIds[0] ?? '') });
+          }}
+        >
+          <option value="">+ Add all tiles of a collection…</option>
+          {collectionsOf(tiles).map((c) => (
+            <option key={c} value={c}>
+              {c} ({tiles.filter((t) => (t.collection ?? '').trim() === c).length} tiles)
+            </option>
+          ))}
+        </select>
+      )}
       {chosen.length > 0 && (
         <SelectField
           label="Starting tile"

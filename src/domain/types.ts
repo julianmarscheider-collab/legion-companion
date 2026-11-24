@@ -58,6 +58,8 @@ export interface EnemyList extends Entity {
 
 export interface MapTile extends Entity {
   name: string;
+  /** Group of tiles, e.g. a boxed set or a homemade batch. Empty = no collection. */
+  collection?: string;
   /** The number printed on the physical tile, used in instructions ("tile 7"). */
   code: string;
   description: string;

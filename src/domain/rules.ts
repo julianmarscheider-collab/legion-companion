@@ -166,6 +166,11 @@ export const RULES = {
     title: 'Tile number / code',
     text: 'The number printed on the physical tile. Instructions refer to tiles by it, e.g. “activate all enemies on tile 7”.',
   },
+  tileCollection: {
+    section: 'Map',
+    title: 'Collection',
+    text: 'Groups tiles, e.g. a boxed set or a batch of homemade tiles. Filter the Map tiles list by collection, and add a whole collection to a map set in one go.',
+  },
   tileMarkers: {
     section: 'Map',
     title: 'Location markers',
