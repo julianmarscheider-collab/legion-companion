@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { HelpTip } from '../../components/HelpTip';
 import { Dropdown } from '../../components/Dropdown';
-import { MinusIcon, PlusIcon } from '../../components/Icons';
+import { MinusIcon, PlusIcon, RoundIcon, SkullIcon, TileIcon } from '../../components/Icons';
 import { TileThumb, UnitThumb } from '../../components/Thumbs';
 import { UnitCard } from '../../components/UnitCard';
 import { repos } from '../../data/repositories';
@@ -66,7 +66,6 @@ export function GamePage() {
     const t = cat.tiles.find((x) => x.id === tid);
     return t ? `Tile ${t.code} – ${t.name}` : '?';
   };
-  const cardsLeft = s.activationDeck.length;
   // Tiles tab: tiles with extra rules first, then alphabetically by name.
   const sortTiles = (ids: string[]) => {
     const info = (id: string) => {
@@ -86,9 +85,17 @@ export function GamePage() {
       <header className="game-header">
         <div>
           <h1>{cat.mission.name}</h1>
-          <small className="muted">
-            {config.difficulty} · Round {s.round} · {plural(s.tilesInPlay.length, 'tile')} in play · {s.tileDeck.length} to explore · {plural(cardsLeft, 'activation card')} left
-          </small>
+          <div className="game-status">
+            <span title="Difficulty">
+              <SkullIcon /> {config.difficulty}
+            </span>
+            <span>
+              <RoundIcon /> Round {s.round}
+            </span>
+            <span>
+              <TileIcon /> {plural(s.tilesInPlay.length, 'tile')} in play
+            </span>
+          </div>
         </div>
         <Link to="/play" className="button ghost">Exit</Link>
       </header>

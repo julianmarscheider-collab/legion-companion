@@ -47,7 +47,7 @@ Create an account on first start. New accounts get a small example set
 ## Game rules as implemented
 
 - **Rolls** are d6 "X+" rolls. Strength = hero's defense target, Defense = hero's attack target.
-- **Points**: stats = 4 × expected damage per attack × expected hero attacks to kill + 2 × speed.
+- **Points**: stats = 4 × expected damage per activation (× attacks) × expected hero attacks to kill (× wounds) + 2 × speed.
   Unit points = (stats + additive abilities) × multiplicative abilities.
 - **Activation deck** (per round): one generic hero card per hero (any hero with a ready
   activation token may act), enemy cards = heroes × difficulty factor (placeholder values

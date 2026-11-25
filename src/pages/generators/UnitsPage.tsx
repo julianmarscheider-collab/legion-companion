@@ -15,7 +15,7 @@ export function factionsOf(units: Unit[]): string[] {
 
 export const newUnit = (ownerId: string): Unit => ({
   ...newEntity(ownerId), name: '', faction: '', description: '', photos: [], strength: 3, damage: 1, defense: 3, defenseType: 'None',
-  speed: 2, toughness: 1, abilityIds: [], count: 1,
+  speed: 2, toughness: 1, attacks: 1, wounds: 1, abilityIds: [], count: 1,
   spawn: { priority: 5, groupedWith: [], minSpawn: 1 },
 });
 
@@ -37,11 +37,13 @@ function UnitEditor({ value: u, onChange }: EditorProps<Unit>) {
       <h3>Stats</h3>
       <div className="grid3">
         <NumberField label="Strength" help="strength" min={1} max={7} value={u.strength} onChange={(strength) => set({ strength })} />
+        <NumberField label="Attacks" help="attacks" min={1} max={20} value={u.attacks ?? 1} onChange={(attacks) => set({ attacks })} />
         <NumberField label="Damage" help="damage" min={0} max={20} value={u.damage} onChange={(damage) => set({ damage })} />
         <NumberField label="Defense" help="defense" min={1} max={7} value={u.defense} onChange={(defense) => set({ defense })} />
         <SelectField label="Defense type" help="defenseType" value={u.defenseType} onChange={(defenseType) => set({ defenseType })} options={DEFENSE_TYPES.map((d) => ({ value: d, label: d }))} />
         <NumberField label="Speed" help="speed" min={0} max={10} value={u.speed} onChange={(speed) => set({ speed })} />
         <NumberField label="Toughness" help="toughness" min={1} max={50} value={u.toughness} onChange={(toughness) => set({ toughness })} />
+        <NumberField label="Wounds" help="wounds" min={1} max={50} value={u.wounds ?? 1} onChange={(wounds) => set({ wounds })} />
       </div>
 
       <PickList

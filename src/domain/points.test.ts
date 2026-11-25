@@ -35,6 +35,13 @@ describe('points', () => {
     expect(unitPoints({ ...ogre, abilityIds: ['mul', 'mul2'] }, abilities)).toBe(Math.round(stats * 3));
   });
 
+  it('counts attacks and wounds', () => {
+    const one = unitPoints(base, []);
+    expect(unitPoints({ ...base, attacks: 3 }, [])).toBeGreaterThan(one);
+    expect(unitPoints({ ...base, wounds: 2 }, [])).toBeGreaterThan(one);
+    expect(unitPoints({ ...base, attacks: 1, wounds: 1 }, [])).toBe(one); // 1 = same as before
+  });
+
   it('adds ability points', () => {
     const abilities = [{ id: 'a', ownerId: 'o', createdAt: 0, updatedAt: 0, name: 'Poison', description: '', points: 3 }];
     const p = unitPoints({ ...base, abilityIds: ['a'] }, abilities);

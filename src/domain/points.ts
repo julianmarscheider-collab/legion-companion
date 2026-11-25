@@ -11,14 +11,17 @@ export function chance(target: number): number {
   return Math.min(1, Math.max(1 / 6, (7 - target) / 6));
 }
 
-/** Expected damage per attack against a hero. */
-export function threat(u: Pick<Unit, 'strength' | 'damage'>): number {
-  return u.damage * (1 - chance(u.strength));
+export const attacksOf = (u: Pick<Unit, 'attacks'>) => Math.max(1, u.attacks ?? 1);
+export const woundsOf = (u: Pick<Unit, 'wounds'>) => Math.max(1, u.wounds ?? 1);
+
+/** Expected damage per activation against a hero (all attacks). */
+export function threat(u: Pick<Unit, 'strength' | 'damage' | 'attacks'>): number {
+  return u.damage * (1 - chance(u.strength)) * attacksOf(u);
 }
 
-/** Expected number of hero attacks needed to kill the unit. */
-export function durability(u: Pick<Unit, 'defense' | 'toughness' | 'defenseType'>): number {
-  return (u.toughness / chance(u.defense)) * DEFENSE_TYPE_MULTIPLIER[u.defenseType];
+/** Expected number of hero attacks needed to kill the unit (all wounds). */
+export function durability(u: Pick<Unit, 'defense' | 'toughness' | 'defenseType' | 'wounds'>): number {
+  return ((u.toughness * woundsOf(u)) / chance(u.defense)) * DEFENSE_TYPE_MULTIPLIER[u.defenseType];
 }
 
 export function basePoints(u: Unit): number {

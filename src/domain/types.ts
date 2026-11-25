@@ -39,6 +39,10 @@ export interface Unit extends Entity {
   speed: number;
   /** Damage needed to kill the unit. */
   toughness: number;
+  /** Attacks per activation (each a separate defense roll). Missing = 1. */
+  attacks?: number;
+  /** Wounds: each takes Toughness damage to remove. Missing = 1. */
+  wounds?: number;
   abilityIds: string[];
   /** Number of physical miniatures owned: the cap on how many can be in play. */
   count: number;

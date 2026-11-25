@@ -21,7 +21,7 @@ export const RULES = {
   points: {
     section: 'Unit stats',
     title: 'Points',
-    text: 'Calculated automatically to balance difficulty. Stats = 4 × expected damage per attack × expected hero attacks needed to kill the unit + 2 × Speed. Unit points = (stats + additive abilities) × multiplicative abilities.',
+    text: 'Calculated automatically to balance difficulty. Stats = 4 × expected damage per activation (all attacks) × expected hero attacks needed to kill the unit (all wounds) + 2 × Speed. Unit points = (stats + additive abilities) × multiplicative abilities.',
   },
   strength: {
     section: 'Unit stats',
@@ -33,6 +33,11 @@ export const RULES = {
     title: 'Damage',
     text: 'Damage a hero takes when their defense roll against this unit fails.',
     todo: 'Hero health and what happens when a hero runs out of it.',
+  },
+  attacks: {
+    section: 'Unit stats',
+    title: 'Attacks',
+    text: 'How many attacks the unit makes when it attacks. The hero makes a separate defense roll against each one. Shown as “(×3)” after Strength when above 1.',
   },
   defense: {
     section: 'Unit stats',
@@ -55,6 +60,11 @@ export const RULES = {
     section: 'Unit stats',
     title: 'Toughness',
     text: 'Damage needed to kill one miniature of this unit.',
+  },
+  wounds: {
+    section: 'Unit stats',
+    title: 'Wounds',
+    text: 'How many wounds the unit has. Each wound takes Toughness damage to remove; the unit dies when all are gone. Shown as “(×2)” after Toughness when above 1.',
   },
   abilities: {
     section: 'Unit stats',

@@ -20,11 +20,11 @@ export async function seedSampleData(ownerId: string) {
   const archer = unit('Goblin Archer', { defenseType: 'Evasive', count: 4, abilityIds: [ranged.id], spawn: { priority: 4, groupedWith: [], minSpawn: 2 } });
   const goblin = unit('Goblin', { count: 12, spawn: { priority: 8, groupedWith: [archer.id], minSpawn: 3 } });
   const troll = unit('Cave Troll', {
-    strength: 5, damage: 2, defense: 4, defenseType: 'Armored', speed: 1, toughness: 5, count: 1,
+    strength: 5, damage: 2, defense: 4, defenseType: 'Armored', speed: 1, toughness: 3, wounds: 2, count: 1,
     abilityIds: [regen.id], spawn: { priority: 2, groupedWith: [], minSpawn: 1 },
   });
   const king = unit('Goblin King', {
-    strength: 4, damage: 2, defense: 4, defenseType: 'Armored', speed: 2, toughness: 6, count: 1,
+    strength: 4, damage: 1, attacks: 2, defense: 4, defenseType: 'Armored', speed: 2, toughness: 6, count: 1,
     abilityIds: [leader.id, poison.id],
     spawn: { priority: 2, groupedWith: [goblin.id], minSpawn: 1 },
   });
