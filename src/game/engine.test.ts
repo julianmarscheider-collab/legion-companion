@@ -39,6 +39,25 @@ describe('engine', () => {
     expect(enemyCardCount(1, 'Easy')).toBe(1);
   });
 
+  it('puts random-tile objectives on a non-start tile without a marker, spreading them out', () => {
+    const c: GameCatalog = {
+      ...cat,
+      mission: { ...cat.mission, objectiveIds: ['r1', 'r2', 'r3'] },
+      objectives: ['r1', 'r2', 'r3'].map((id) => ({
+        ...meta, id, name: id, description: '', placement: 'tile' as const, markerType: 'Altar', setup: '', completion: '',
+      })),
+    };
+    for (let seed = 0; seed < 30; seed++) {
+      const g = createGame(config, c, seed);
+      expect(g.placements).toHaveLength(3);
+      for (const p of g.placements) {
+        expect(p.tileId).not.toBe('t1');
+        expect(p.markerLabel).toBeUndefined(); // marker type is ignored for random-tile objectives
+      }
+      expect(new Set(g.placements.map((p) => p.tileId)).size).toBe(3);
+    }
+  });
+
   it('is deterministic for the same seed', () => {
     const run = () => {
       let g = createGame(config, cat, 7);

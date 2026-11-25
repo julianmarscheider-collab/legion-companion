@@ -7,6 +7,7 @@ import { TileThumb } from '../../components/Thumbs';
 import { factionsOf } from './UnitsPage';
 import { newEntity, repos } from '../../data/repositories';
 import { useCollection } from '../../data/useCollection';
+import { placementLabel } from '../../domain/objectives';
 import { abilityCostLabel, isMultiplier, unitPoints } from '../../domain/points';
 import type { Ability, CostType, EnemyList, MapSet, MapTile, Mission, Objective } from '../../domain/types';
 
@@ -158,7 +159,19 @@ function ObjectiveEditor({ value: o, onChange }: EditorProps<Objective>) {
           ]}
         />
       )}
-      <TextField label="Placed on marker type" help="markerType" suggestions={markerTypes} value={o.markerType} onChange={(markerType) => onChange({ ...o, markerType })} placeholder="e.g. Altar (leave empty for any tile)" />
+      <SelectField<'marker' | 'tile'>
+        label="Placed on"
+        help="objectivePlacement"
+        value={o.placement ?? 'marker'}
+        onChange={(placement) => onChange({ ...o, placement })}
+        options={[
+          { value: 'marker', label: 'A marker of a certain type' },
+          { value: 'tile', label: 'A random tile (anywhere on it)' },
+        ]}
+      />
+      {o.placement !== 'tile' && (
+        <TextField label="Marker type" help="markerType" suggestions={markerTypes} value={o.markerType} onChange={(markerType) => onChange({ ...o, markerType })} placeholder="e.g. Altar" />
+      )}
       <TextArea label="Flavour text" help="objectiveFlavour" rows={4} value={o.flavour ?? ''} onChange={(flavour) => onChange({ ...o, flavour })} placeholder="e.g. A foul smell rises from the cracked altar…" />
       <TextArea label="Setup when revealed" help="objectiveSetup" value={o.setup} onChange={(setup) => onChange({ ...o, setup })} placeholder="What the players place on the board" />
       <TextArea label="How to complete it" help="objectiveCompletion" value={o.completion} onChange={(completion) => onChange({ ...o, completion })} />
@@ -173,10 +186,10 @@ export function ObjectivesPage() {
       title="Objectives"
       intro="Objectives are hidden on a map tile marker and revealed when that tile is explored."
       repo={repos.objectives}
-      create={(o) => ({ ...newEntity(o), name: '', description: '', flavour: '', markerType: '', setup: '', completion: '', isStart: true, revealedBy: '' })}
+      create={(o) => ({ ...newEntity(o), name: '', description: '', flavour: '', placement: 'marker' as const, markerType: '', setup: '', completion: '', isStart: true, revealedBy: '' })}
       Editor={ObjectiveEditor}
       summary={(o) => (
-        <div><strong>{o.name}</strong><br /><small className="muted">{o.markerType ? `On: ${o.markerType}` : 'Any tile'}</small></div>
+        <div><strong>{o.name}</strong><br /><small className="muted">On: {placementLabel(o)}</small></div>
       )}
     />
   );
@@ -196,7 +209,7 @@ function MissionEditor({ value: m, onChange }: EditorProps<Mission>) {
         items={objectives}
         selected={m.objectiveIds}
         onChange={(objectiveIds) => onChange({ ...m, objectiveIds })}
-        extra={(o) => (o.markerType ? `(${o.markerType})` : '')}
+        extra={(o) => `(${placementLabel(o)})`}
         noItemsText="Create objectives first."
       />
     </div>

@@ -121,10 +121,15 @@ export const RULES = {
   },
 
   // ---- Objectives & missions ----
+  objectivePlacement: {
+    section: 'Objectives & missions',
+    title: 'Placed on',
+    text: 'Where the app hides the objective at the start of the game. “A marker of a certain type”: on a random marker of that type (e.g. any Altar). “A random tile”: anywhere on a random tile (never the starting tile, and preferably one without another objective). The objective is revealed when that tile is explored.',
+  },
   markerType: {
     section: 'Objectives & missions',
     title: 'Marker type',
-    text: 'The objective is hidden on a random tile marker of this type (e.g. Altar) and revealed when that tile is explored. Leave empty to place it on any tile.',
+    text: 'The objective is hidden on a random tile marker of this type (e.g. Altar) and revealed when that tile is explored. If no tile in the map set has such a marker, it goes on a random tile instead.',
     link: { to: '/tiles', label: 'Open map tiles' },
   },
   objectiveStart: {

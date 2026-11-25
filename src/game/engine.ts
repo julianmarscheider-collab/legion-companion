@@ -1,5 +1,6 @@
 // Pure game logic: no UI, no database. Every action takes a snapshot and
 // returns a new one, which makes save/load and undo trivial.
+import { objectiveMarkerType } from '../domain/objectives';
 import { unitPoints } from '../domain/points';
 import type { Ability, Difficulty, EnemyList, MapSet, MapTile, Mission, Objective, Unit } from '../domain/types';
 import { Rng } from './rng';
@@ -130,8 +131,9 @@ function placeObjectives(cat: GameCatalog, rng: Rng): Placement[] {
     .map((id) => cat.objectives.find((o) => o.id === id))
     .filter((o): o is Objective => !!o);
 
+  const tilesWithObjective = () => new Set(placements.map((p) => p.tileId));
   for (const obj of objectives) {
-    const type = obj.markerType.trim().toLowerCase();
+    const type = objectiveMarkerType(obj).toLowerCase();
     if (type) {
       const options = tiles.flatMap((t) =>
         t.markers
@@ -145,7 +147,11 @@ function placeObjectives(cat: GameCatalog, rng: Rng): Placement[] {
         continue;
       }
     }
-    const pool = nonStart.length ? nonStart : tiles;
+    // Random tile: not the starting tile, and preferably one without another objective.
+    const base = nonStart.length ? nonStart : tiles;
+    const taken = tilesWithObjective();
+    const free = base.filter((t) => !taken.has(t.id));
+    const pool = free.length ? free : base;
     if (pool.length) placements.push({ objectiveId: obj.id, tileId: pool[rng.int(pool.length)].id });
   }
   return placements;
