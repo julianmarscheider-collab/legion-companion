@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { HelpTip } from '../../components/HelpTip';
 import { Dropdown } from '../../components/Dropdown';
@@ -23,42 +23,10 @@ export function GamePage() {
   // Tile extra rules are shown by default; this holds the tiles the players collapsed.
   const [collapsedTiles, setCollapsedTiles] = useState<string[]>([]);
 
-  // Card draw animation: the drawn card flies from its pile to the table and flips face up.
+  // The last drawn card glows softly for a moment (set when a pile is clicked, not on undo).
   const activationPile = useRef<HTMLDivElement>(null);
   const tilePile = useRef<HTMLDivElement>(null);
-  const drawnCard = useRef<HTMLDivElement>(null);
-  const pendingFlip = useRef<{ from: DOMRect; logLength: number } | null>(null);
-  // Card animations are on by default (part of the board game feel); players can switch them off.
-  const [animations, setAnimations] = useState(() => localStorage.getItem('tc.animations') !== 'off');
-  const toggleAnimations = () => {
-    localStorage.setItem('tc.animations', animations ? 'off' : 'on');
-    setAnimations(!animations);
-  };
-  useLayoutEffect(() => {
-    const f = pendingFlip.current;
-    const el = drawnCard.current;
-    if (!f || !el || game?.snapshot.log.length !== f.logLength) return;
-    pendingFlip.current = null;
-    if (!animations) return;
-    const to = el.getBoundingClientRect();
-    const dx = f.from.left + f.from.width / 2 - (to.left + to.width / 2);
-    const dy = f.from.top + f.from.height / 2 - (to.top + to.height / 2);
-    const scale = Math.min(1, f.from.width / to.width);
-    const timing = { duration: 750, easing: 'cubic-bezier(0.25, 0.8, 0.3, 1)' };
-    const EDGE = 0.55; // the card is edge-on here: switch from back to front
-    el.animate(
-      [
-        { transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotateY(180deg)`, offset: 0 },
-        { transform: `translate(${dx * 0.35}px, ${dy * 0.35 - 30}px) scale(${(scale + 1) / 2}) rotateY(90deg)`, offset: EDGE },
-        { transform: 'none', offset: 1 },
-      ],
-      timing,
-    );
-    // Show the back for the first half and the front for the second, independent of 3D support.
-    const show = (o: number) => [{ opacity: o, offset: 0 }, { opacity: o, offset: EDGE }, { opacity: 1 - o, offset: EDGE }, { opacity: 1 - o, offset: 1 }];
-    el.querySelector('.face.back')?.animate(show(1), timing);
-    el.querySelector('.face.front')?.animate(show(0), timing);
-  }, [game, animations]);
+  const [glowAt, setGlowAt] = useState<number | null>(null);
 
   useEffect(() => {
     repos.games.get(id!).then((g) => setGame(g ?? null));
@@ -76,10 +44,8 @@ export function GamePage() {
     setGame(updated);
     repos.games.put(updated);
   };
-  // Remember where the card comes from, then draw it; the layout effect animates it.
-  const draw = (pile: RefObject<HTMLDivElement | null>, action: () => GameSnapshot) => {
-    const from = pile.current?.getBoundingClientRect();
-    if (from) pendingFlip.current = { from, logLength: s.log.length + 1 };
+  const draw = (action: () => GameSnapshot) => {
+    setGlowAt(s.log.length + 1);
     apply(action());
   };
   const undo = () => {
@@ -137,8 +103,7 @@ export function GamePage() {
                 event={e}
                 cat={cat}
                 small={!drawn && current.some(isDrawnCard)}
-                back={drawn ? (e.kind === 'tile' || e.kind === 'tileDeckEmpty' ? 'tiles' : 'activation') : undefined}
-                ref={drawn ? drawnCard : undefined}
+                glow={drawn && glowAt === s.log.length}
               />
             );
           })}
@@ -151,7 +116,7 @@ export function GamePage() {
             label="Activation deck"
             count={s.activationDeck.length}
             note={s.activationDeck.length ? `${plural(s.activationDeck.length, 'card')} left` : 'Round over: draw to reshuffle'}
-            onDraw={() => draw(activationPile, () => drawActivation(s, config, cat))}
+            onDraw={() => draw(() => drawActivation(s, config, cat))}
           />
           <CardPile
             ref={tilePile}
@@ -160,15 +125,12 @@ export function GamePage() {
             count={s.tileDeck.length}
             note={s.tileDeck.length ? `${plural(s.tileDeck.length, 'tile')} left` : 'No tiles left'}
             disabled={s.tileDeck.length === 0}
-            onDraw={() => draw(tilePile, () => exploreTile(s, cat))}
+            onDraw={() => draw(() => exploreTile(s, cat))}
           />
         </div>
         <div className="table-controls">
           <button className="ghost undo" onClick={undo} disabled={game.history.length === 0}>
             ↶ Undo
-          </button>
-          <button className="ghost small" onClick={toggleAnimations} aria-pressed={animations}>
-            Animations: {animations ? 'on' : 'off'}
           </button>
         </div>
       </section>

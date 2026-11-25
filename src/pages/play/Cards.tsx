@@ -29,35 +29,23 @@ export function CardBack({ kind }: { kind: 'activation' | 'tiles' }) {
   );
 }
 
-/**
- * A face-up card for one game event. Drawn cards have a back face too, so the
- * flip animation shows the back first and then the front.
- */
-export const PlayCard = forwardRef<HTMLDivElement, { event: GameEvent; cat: GameCatalog; back?: 'activation' | 'tiles'; small?: boolean }>(
-  function PlayCard({ event, cat, back, small }, ref) {
-    const d = describe(event, cat);
-    const tile = d.tileId ? cat.tiles.find((t) => t.id === d.tileId) : undefined;
-    return (
-      <div className={`flipper ${small ? 'small' : ''}`} ref={ref}>
-        <article className={`play-card face front tone-${d.tone}`}>
-          <header className="play-card-band">{TYPE_LABEL[event.kind]}</header>
-          <div className="play-card-body">
-            <h2>{d.title}</h2>
-            {tile && <TileThumb tile={tile} size="large" />}
-            {d.lines.map((l, i) => (
-              <p key={i}>{l}</p>
-            ))}
-          </div>
-        </article>
-        {back && (
-          <div className="face back" aria-hidden="true">
-            <CardBack kind={back} />
-          </div>
-        )}
+/** A face-up card for one game event. `glow`: just drawn, so it glows softly for a moment. */
+export function PlayCard({ event, cat, small, glow }: { event: GameEvent; cat: GameCatalog; small?: boolean; glow?: boolean }) {
+  const d = describe(event, cat);
+  const tile = d.tileId ? cat.tiles.find((t) => t.id === d.tileId) : undefined;
+  return (
+    <article className={`play-card tone-${d.tone} ${small ? 'small' : ''} ${glow ? 'glow' : ''}`}>
+      <header className="play-card-band">{TYPE_LABEL[event.kind]}</header>
+      <div className="play-card-body">
+        <h2>{d.title}</h2>
+        {tile && <TileThumb tile={tile} size="large" />}
+        {d.lines.map((l, i) => (
+          <p key={i}>{l}</p>
+        ))}
       </div>
-    );
-  },
-);
+    </article>
+  );
+}
 
 /** A pile of face-down cards. Thicker the more cards are left; click to draw. */
 export const CardPile = forwardRef<
