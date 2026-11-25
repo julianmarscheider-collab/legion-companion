@@ -1,8 +1,18 @@
-import type { Ability, MapTile, Unit } from '../domain/types';
-import { newEntity, repos } from './repositories';
+import type { Ability, EnemyList, Entity, MapSet, MapTile, Mission, Objective, Unit } from '../domain/types';
+import { newEntity, repos, type Repository } from './repositories';
 
-/** Example content created for every new account so the app is playable at once. */
-export async function seedSampleData(ownerId: string) {
+export interface SampleData {
+  abilities: Ability[];
+  units: Unit[];
+  tiles: MapTile[];
+  objectives: Objective[];
+  missions: Mission[];
+  enemyLists: EnemyList[];
+  mapSets: MapSet[];
+}
+
+/** The example content (fresh ids), used for new accounts and for "Restore example content". */
+export function buildSampleData(ownerId: string): SampleData {
   const e = () => newEntity(ownerId);
 
   const ability = (name: string, description: string, points: number): Ability => ({ ...e(), name, description, points });
@@ -68,13 +78,90 @@ export async function seedSampleData(ownerId: string) {
   });
   const objectives = [shrine, prisoner, key];
 
+  return {
+    abilities,
+    units,
+    tiles,
+    objectives: objectives as Objective[],
+    missions: [{ ...e(), name: 'The Goblin Warren', description: 'Search the rubble for the key, free the prisoner and desecrate the goblin shrine.', objectiveIds: [key.id, prisoner.id, shrine.id] }],
+    enemyLists: [{ ...e(), name: 'Goblin Horde', description: '', unitIds: units.map((u) => u.id) }],
+    mapSets: [{ ...e(), name: 'Goblin Caves', description: '', tileIds: tiles.map((t) => t.id), startTileId: tiles[0].id }],
+  };
+}
+
+async function saveAll(d: SampleData) {
   await Promise.all([
-    ...abilities.map((a) => repos.abilities.put(a)),
-    ...units.map((u) => repos.units.put(u)),
-    ...tiles.map((t) => repos.mapTiles.put(t)),
-    ...objectives.map((o) => repos.objectives.put(o)),
-    repos.missions.put({ ...e(), name: 'The Goblin Warren', description: 'Search the rubble for the key, free the prisoner and desecrate the goblin shrine.', objectiveIds: [key.id, prisoner.id, shrine.id] }),
-    repos.enemyLists.put({ ...e(), name: 'Goblin Horde', description: '', unitIds: units.map((u) => u.id) }),
-    repos.mapSets.put({ ...e(), name: 'Goblin Caves', description: '', tileIds: tiles.map((t) => t.id), startTileId: tiles[0].id }),
+    ...d.abilities.map((x) => repos.abilities.put(x)),
+    ...d.units.map((x) => repos.units.put(x)),
+    ...d.tiles.map((x) => repos.mapTiles.put(x)),
+    ...d.objectives.map((x) => repos.objectives.put(x)),
+    ...d.missions.map((x) => repos.missions.put(x)),
+    ...d.enemyLists.map((x) => repos.enemyLists.put(x)),
+    ...d.mapSets.map((x) => repos.mapSets.put(x)),
   ]);
+}
+
+/** Example content created for every new account so the app is playable at once. */
+export async function seedSampleData(ownerId: string) {
+  await saveAll(buildSampleData(ownerId));
+}
+
+/** Earlier names of example items, so restoring updates them instead of adding a copy. */
+const LEGACY_NAMES: Record<string, string[]> = { 'Search the Rubble': ['Find the Rusty Key'] };
+
+/**
+ * Reset the example content to its current version. Example items that still
+ * exist (matched by name) are overwritten but keep their id, so the player's
+ * own lists, missions and map sets that use them keep working, and keep any
+ * images the player added. Missing examples are added again. Nothing else is touched.
+ */
+export async function restoreSampleData(ownerId: string): Promise<{ updated: number; added: number }> {
+  const ex = buildSampleData(ownerId);
+  const idMap = new Map<string, string>(); // example id -> existing id
+  const keep = new Map<string, Entity & { photos?: string[] }>(); // existing item per example id
+  let updated = 0;
+
+  async function match<T extends Entity & { name: string }>(repo: Repository<T>, items: T[]) {
+    const existing = await repo.list(ownerId);
+    const taken = new Set<string>();
+    for (const item of items) {
+      const names = [item.name, ...(LEGACY_NAMES[item.name] ?? [])];
+      const found = existing.find((x) => !taken.has(x.id) && names.includes(x.name));
+      if (found) {
+        taken.add(found.id);
+        idMap.set(item.id, found.id);
+        keep.set(item.id, found);
+        updated++;
+      }
+    }
+  }
+  await match(repos.abilities, ex.abilities);
+  await match(repos.units, ex.units);
+  await match(repos.mapTiles, ex.tiles);
+  await match(repos.objectives, ex.objectives);
+  await match(repos.missions, ex.missions);
+  await match(repos.enemyLists, ex.enemyLists);
+  await match(repos.mapSets, ex.mapSets);
+
+  const id = (x: string) => idMap.get(x) ?? x;
+  const ids = (xs: string[]) => xs.map(id);
+  // Keep the existing id and creation time, and the player's images if the example has none.
+  const base = <T extends Entity & { photos?: string[] }>(x: T): T => {
+    const old = keep.get(x.id);
+    if (!old) return x;
+    const photos = x.photos && x.photos.length === 0 && old.photos?.length ? old.photos : x.photos;
+    return { ...x, id: old.id, createdAt: old.createdAt, ...(x.photos ? { photos } : {}) };
+  };
+
+  await saveAll({
+    abilities: ex.abilities.map(base),
+    units: ex.units.map((u) => ({ ...base(u), abilityIds: ids(u.abilityIds), spawn: { ...u.spawn, groupedWith: ids(u.spawn.groupedWith) } })),
+    tiles: ex.tiles.map(base),
+    objectives: ex.objectives.map((o) => ({ ...base(o), ...(o.revealedBy ? { revealedBy: id(o.revealedBy) } : {}) })),
+    missions: ex.missions.map((m) => ({ ...base(m), objectiveIds: ids(m.objectiveIds) })),
+    enemyLists: ex.enemyLists.map((l) => ({ ...base(l), unitIds: ids(l.unitIds) })),
+    mapSets: ex.mapSets.map((m) => ({ ...base(m), tileIds: ids(m.tileIds), startTileId: id(m.startTileId) })),
+  });
+  const total = ex.abilities.length + ex.units.length + ex.tiles.length + ex.objectives.length + ex.missions.length + ex.enemyLists.length + ex.mapSets.length;
+  return { updated, added: total - updated };
 }

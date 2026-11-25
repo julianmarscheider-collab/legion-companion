@@ -406,3 +406,33 @@ p.tile-rules { margin: 0.5rem 0 0; }
 .game-status { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 1.3rem; margin-top: 0.2rem; color: var(--muted); }
 .game-status span { display: inline-flex; align-items: center; gap: 0.4rem; }
 .game-status .icon { width: 15px; height: 15px; color: var(--gold); }
+.link-button { background: none; border: none; padding: 0; min-height: 0; color: var(--gold); font: inherit; cursor: pointer; }
+.link-button:hover:not(:disabled) { border: none; text-decoration: underline; }
+
+/* ---- Game layout: table + sidebar (enemies, objectives) ---- */
+.game { max-width: 1180px; }
+.game-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: start; }
+@media (min-width: 980px) { .game-layout { grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr); } }
+.game-side { display: flex; flex-direction: column; gap: 1rem; }
+.side-panel { background: #201b15; border: 1px solid var(--border); border-radius: 14px; padding: 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.side-panel > h3 { margin: 0 0 0.2rem; font-size: 1rem; }
+.side-panel .list { gap: 0.4rem; }
+.side-panel .add-enemy.dropdown { margin-top: 0.1rem; }
+.side-panel .victory { margin: 0.3rem 0 0; color: var(--gold); font-weight: 700; text-align: center; }
+
+/* Quest cards */
+.quest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.6rem; }
+.quest-card { display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; border: 2px solid #6b5126; background: linear-gradient(#2e261c, #241d16); box-shadow: 0 0 0 2px #17120d, 0 6px 14px #0009; }
+.quest-card.expanded { grid-column: 1 / -1; }
+.quest-card > header { font-family: var(--font-heading); font-weight: 700; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.2rem 0.6rem; background: var(--green); color: #1b1712; }
+.quest-card.locked > header, .quest-card.unfound > header { background: #6d6052; color: #f0e6d6; }
+.quest-card.done > header { background: #3e5a3c; color: #dfe9d8; }
+.quest-card.done .quest-main strong { text-decoration: line-through; text-decoration-color: var(--muted); }
+.quest-card.unfound { border-style: dashed; opacity: 0.75; }
+.quest-main { display: flex; flex-direction: column; align-items: flex-start; gap: 0.15rem; text-align: left; background: none; border: none; border-radius: 0; padding: 0.5rem 0.65rem 0.3rem; min-height: 0; line-height: 1.25; }
+.quest-main:hover:not(:disabled) { border: none; background: #ffffff08; }
+.quest-main small { color: var(--muted); font-size: 0.85rem; }
+.quest-details { padding: 0 0.65rem 0.3rem; font-size: 0.95rem; }
+.quest-details p { margin: 0.25rem 0; }
+.quest-check { display: flex; align-items: center; gap: 0.45rem; padding: 0.15rem 0.65rem 0.5rem; margin-top: auto; cursor: pointer; font-size: 0.95rem; }
+.quest-check input { width: 20px; height: 20px; accent-color: var(--gold); }

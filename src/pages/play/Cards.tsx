@@ -88,3 +88,53 @@ export const CardPile = forwardRef<
     </button>
   );
 });
+
+export type QuestState = 'open' | 'done' | 'locked' | 'unfound';
+
+const QUEST_BAND: Record<QuestState, string> = {
+  open: 'Objective',
+  done: '✓ Completed',
+  locked: '🔒 Locked',
+  unfound: 'Not found yet',
+};
+
+/**
+ * Small objective card for the sidebar. Tap it to show its details; found
+ * objectives have a "Completed" tick, locked ones show what they require.
+ */
+export function QuestCard(p: {
+  name: string;
+  state: QuestState;
+  /** e.g. "Tile 5 – Prison Cells, marker A" */
+  where?: string;
+  /** Name of the prerequisite, for locked objectives. */
+  requires?: string;
+  flavour?: string;
+  text?: string;
+  expanded: boolean;
+  onToggle(): void;
+  onComplete?(): void;
+}) {
+  const sub = p.state === 'locked' ? `requires “${p.requires}”` : p.state === 'unfound' ? 'Keep exploring' : p.where;
+  return (
+    <article className={`quest-card ${p.state} ${p.expanded ? 'expanded' : ''}`}>
+      <header>{QUEST_BAND[p.state]}</header>
+      <button type="button" className="quest-main" aria-expanded={p.expanded} onClick={p.onToggle}>
+        <strong>{p.name}</strong>
+        {sub && <small>{sub}</small>}
+      </button>
+      {p.expanded && (
+        <div className="quest-details">
+          {p.flavour && <p className="flavour">{p.flavour}</p>}
+          {p.text && <p>{p.text}</p>}
+        </div>
+      )}
+      {(p.state === 'open' || p.state === 'done') && p.onComplete && (
+        <label className="quest-check">
+          <input type="checkbox" checked={p.state === 'done'} onChange={p.onComplete} />
+          <span>Completed</span>
+        </label>
+      )}
+    </article>
+  );
+}

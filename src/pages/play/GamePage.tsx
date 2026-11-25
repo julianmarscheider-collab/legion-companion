@@ -8,20 +8,21 @@ import { UnitCard } from '../../components/UnitCard';
 import { repos } from '../../data/repositories';
 import type { SavedGame } from '../../data/savedGame';
 import { changeEnemies, drawActivation, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, exploreTile, toggleObjective, type GameSnapshot } from '../../game/engine';
-import { CardPile, isDrawnCard, PlayCard } from './Cards';
+import { CardPile, isDrawnCard, PlayCard, QuestCard, type QuestState } from './Cards';
 import { describe, describedText } from './describe';
 
 const MAX_HISTORY = 200;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-type Tab = 'enemies' | 'tiles' | 'objectives' | 'log';
+type Tab = 'tiles' | 'log';
 
 export function GamePage() {
   const { id } = useParams();
   const [game, setGame] = useState<SavedGame | null | undefined>(undefined);
-  const [tab, setTab] = useState<Tab>('enemies');
+  const [tab, setTab] = useState<Tab>('tiles');
   const [openUnit, setOpenUnit] = useState<string | null>(null);
   // Tile extra rules are shown by default; this holds the tiles the players collapsed.
   const [collapsedTiles, setCollapsedTiles] = useState<string[]>([]);
+  const [openQuest, setOpenQuest] = useState<string | null>(null);
 
   // The last drawn card glows softly for a moment (set when a pile is clicked, not on undo).
   const activationPile = useRef<HTMLDivElement>(null);
@@ -60,12 +61,38 @@ export function GamePage() {
   const found = foundObjectives(s, cat);
   const locked = lockedObjectives(s, cat); // on the table, prerequisite not completed yet
   const hiddenCount = s.placements.filter((p) => !isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat) && !locked.has(p.objectiveId)).length;
-  const unfoundCount = s.placements.length - found.size - locked.size - hiddenCount;
-  const objectiveName = (id?: string) => cat.objectives.find((x) => x.id === id)?.name ?? '';
   const tileName = (tid: string) => {
     const t = cat.tiles.find((x) => x.id === tid);
     return t ? `Tile ${t.code} – ${t.name}` : '?';
   };
+  const objectiveName = (id?: string) => cat.objectives.find((x) => x.id === id)?.name ?? '';
+  // Objectives the players know about, as quest cards: found, locked, or known but not found yet.
+  const questCards = s.placements
+    .filter((p) => found.has(p.objectiveId) || locked.has(p.objectiveId) || isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat))
+    .map((p) => {
+      const o = cat.objectives.find((x) => x.id === p.objectiveId);
+      const state: QuestState = locked.has(p.objectiveId)
+        ? 'locked'
+        : !found.has(p.objectiveId)
+          ? 'unfound'
+          : s.completedObjectives.includes(p.objectiveId)
+            ? 'done'
+            : 'open';
+      return {
+        id: p.objectiveId,
+        name: o?.name ?? '',
+        state,
+        where: `${tileName(p.tileId)}${p.markerLabel ? `, marker ${p.markerLabel}` : ''}`,
+        requires: objectiveName(o?.revealedBy),
+        flavour: (state === 'locked' ? o?.lockedFlavour : state === 'unfound' ? '' : o?.flavour)?.trim(),
+        text:
+          state === 'locked'
+            ? o?.lockedText?.trim() || 'It can’t be completed yet.'
+            : state === 'unfound'
+              ? 'Not discovered yet: it is on a tile that hasn’t been explored.'
+              : o?.completion?.trim(),
+      };
+    });
   // Tiles tab: tiles with extra rules first, then alphabetically by name.
   const sortTiles = (ids: string[]) => {
     const info = (id: string) => {
@@ -100,138 +127,125 @@ export function GamePage() {
         <Link to="/play" className="button ghost">Exit</Link>
       </header>
 
-      <section className="table">
-        <div className="card-stage" key={s.log.length}>
-          {current.map((e, i) => {
-            const drawn = isDrawnCard(e);
-            return (
-              <PlayCard
-                key={i}
-                event={e}
-                cat={cat}
-                small={!drawn && current.some(isDrawnCard)}
-                glow={drawn && glowAt === s.log.length}
-              />
-            );
-          })}
-        </div>
+      <div className="game-layout">
+        <section className="table">
+          <div className="card-stage" key={s.log.length}>
+            {current.map((e, i) => {
+              const drawn = isDrawnCard(e);
+              return (
+                <PlayCard
+                  key={i}
+                  event={e}
+                  cat={cat}
+                  small={!drawn && current.some(isDrawnCard)}
+                  glow={drawn && glowAt === s.log.length}
+                />
+              );
+            })}
+          </div>
 
-        <div className="piles">
-          <CardPile
-            ref={activationPile}
-            kind="activation"
-            label="Activation deck"
-            count={s.activationDeck.length}
-            note={s.activationDeck.length ? `${plural(s.activationDeck.length, 'card')} left` : 'Round over: draw to reshuffle'}
-            onDraw={() => draw(() => drawActivation(s, config, cat))}
-          />
-          <CardPile
-            ref={tilePile}
-            kind="tiles"
-            label="Map tiles"
-            count={s.tileDeck.length}
-            note={s.tileDeck.length ? `${plural(s.tileDeck.length, 'tile')} left` : 'No tiles left'}
-            disabled={s.tileDeck.length === 0}
-            onDraw={() => draw(() => exploreTile(s, cat))}
-          />
-        </div>
-        <div className="table-controls">
-          <button className="ghost undo" onClick={undo} disabled={game.history.length === 0}>
-            ↶ Undo
-          </button>
-        </div>
-      </section>
+          <div className="piles">
+            <CardPile
+              ref={activationPile}
+              kind="activation"
+              label="Activation deck"
+              count={s.activationDeck.length}
+              note={s.activationDeck.length ? `${plural(s.activationDeck.length, 'card')} left` : 'Round over: draw to reshuffle'}
+              onDraw={() => draw(() => drawActivation(s, config, cat))}
+            />
+            <CardPile
+              ref={tilePile}
+              kind="tiles"
+              label="Map tiles"
+              count={s.tileDeck.length}
+              note={s.tileDeck.length ? `${plural(s.tileDeck.length, 'tile')} left` : 'No tiles left'}
+              disabled={s.tileDeck.length === 0}
+              onDraw={() => draw(() => exploreTile(s, cat))}
+            />
+          </div>
+          <div className="table-controls">
+            <button className="ghost undo" onClick={undo} disabled={game.history.length === 0}>
+              ↶ Undo
+            </button>
+          </div>
+        </section>
+        <aside className="game-side">
+          <section className="side-panel">
+            <h3>Enemies on the board</h3>
+                <ul className="list">
+                  {cat.units
+                    .filter((u) => (s.inPlay[u.id] ?? 0) > 0)
+                    .map((u) => {
+                      const n = s.inPlay[u.id];
+                      return (
+                        <li key={u.id} className="card enemy-row">
+                          <div className="row between">
+                            <UnitThumb unit={u} />
+                            <button className="ghost grow left" onClick={() => setOpenUnit(openUnit === u.id ? null : u.id)}>
+                              <span className="enemy-name">
+                                <strong>{u.name}</strong>
+                                <span className="board-count" aria-label={`${n} on the board`}>×{n}</span>
+                              </span>
+                              <small className="muted">{u.count} owned · tap for card</small>
+                            </button>
+                            <div className="row gap">
+                              <button title="Killed: remove one" aria-label={`Remove one ${u.name}`} onClick={() => apply(changeEnemies(s, cat, u.id, -1))}><MinusIcon /></button>
+                              <button title="Add one" aria-label={`Add one ${u.name}`} onClick={() => apply(changeEnemies(s, cat, u.id, 1))} disabled={n >= u.count}><PlusIcon /></button>
+                            </div>
+                          </div>
+                          {openUnit === u.id && <UnitCard unit={u} abilities={cat.abilities} />}
+                        </li>
+                      );
+                    })}
+                  {enemiesOnBoard(s) === 0 && <li className="muted center">No enemies on the board.</li>}
+                </ul>
+                <Dropdown
+                  action
+                  className="add-enemy"
+                  value=""
+                  placeholder="+ Add enemy by hand…"
+                  ariaLabel="Add enemy by hand"
+                  options={cat.units
+                    .filter((u) => (s.inPlay[u.id] ?? 0) < u.count)
+                    .map((u) => ({ value: u.id, label: `${u.name} (${u.count - (s.inPlay[u.id] ?? 0)} free)` }))}
+                  onChange={(unitId) => apply(changeEnemies(s, cat, unitId, 1))}
+                />
+        
+          </section>
+          <section className="side-panel">
+            <h3>Objectives</h3>
+            <div className="quest-grid">
+              {questCards.map((q) => (
+                <QuestCard
+                  key={q.id}
+                  {...q}
+                  expanded={openQuest === q.id}
+                  onToggle={() => setOpenQuest(openQuest === q.id ? null : q.id)}
+                  onComplete={q.state === 'open' || q.state === 'done' ? () => apply(toggleObjective(s, cat, q.id)) : undefined}
+                />
+              ))}
+            </div>
+            {questCards.length === 0 && <p className="muted small">No objectives found yet. Keep exploring.</p>}
+            {hiddenCount > 0 && (
+              <small className="muted">{hiddenCount === 1 ? '1 more objective is' : `${hiddenCount} more objectives are`} still hidden.</small>
+            )}
+            {s.placements.length > 0 && s.completedObjectives.length === s.placements.length && (
+              <p className="victory">All objectives complete: the heroes are victorious!</p>
+            )}
+          </section>
+        </aside>
+      </div>
       <p className="muted small center">
         The game is saved automatically after every draw. How the activation deck works <HelpTip rule="activationDeck" />
       </p>
 
-      {/* Found objectives, with a "Completed" checkbox right in the play area */}
-      {s.placements.some((p) => found.has(p.objectiveId) || locked.has(p.objectiveId)) && (
-        <section className="objective-checklist card">
-          <h3>Objectives</h3>
-          {s.placements
-            .filter((p) => found.has(p.objectiveId) || locked.has(p.objectiveId))
-            .map((p) => {
-              const o = cat.objectives.find((x) => x.id === p.objectiveId);
-              const done = s.completedObjectives.includes(p.objectiveId);
-              if (locked.has(p.objectiveId))
-                return (
-                  <div key={p.objectiveId} className="objective-check locked">
-                    <span className="lock" aria-hidden="true">🔒</span>
-                    <span>
-                      {o?.name}
-                      <small className="muted"> · requires “{objectiveName(o?.revealedBy)}”</small>
-                    </span>
-                  </div>
-                );
-              return (
-                <label key={p.objectiveId} className={`objective-check ${done ? 'done' : ''}`}>
-                  <input type="checkbox" checked={done} onChange={() => apply(toggleObjective(s, cat, p.objectiveId))} />
-                  <span>
-                    {o?.name}
-                    <small className="muted"> · {tileName(p.tileId)}{p.markerLabel ? `, marker ${p.markerLabel}` : ''}</small>
-                  </span>
-                </label>
-              );
-            })}
-          {hiddenCount + unfoundCount > 0 && (
-            <small className="muted">
-              {[unfoundCount > 0 && `${unfoundCount} not discovered yet`, hiddenCount > 0 && `${hiddenCount} still hidden`].filter(Boolean).join(' · ')}
-            </small>
-          )}
-        </section>
-      )}
-
       <nav className="tabs">
-        {(['enemies', 'tiles', 'objectives', 'log'] as Tab[]).map((t) => (
+        {(['tiles', 'log'] as Tab[]).map((t) => (
           <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
             {t[0].toUpperCase() + t.slice(1)}
           </button>
         ))}
       </nav>
-
-      {tab === 'enemies' && (
-        <>
-          <ul className="list">
-            {cat.units
-              .filter((u) => (s.inPlay[u.id] ?? 0) > 0)
-              .map((u) => {
-                const n = s.inPlay[u.id];
-                return (
-                  <li key={u.id} className="card enemy-row">
-                    <div className="row between">
-                      <UnitThumb unit={u} />
-                      <button className="ghost grow left" onClick={() => setOpenUnit(openUnit === u.id ? null : u.id)}>
-                        <span className="enemy-name">
-                          <strong>{u.name}</strong>
-                          <span className="board-count" aria-label={`${n} on the board`}>×{n}</span>
-                        </span>
-                        <small className="muted">{u.count} owned · tap for card</small>
-                      </button>
-                      <div className="row gap">
-                        <button title="Killed: remove one" aria-label={`Remove one ${u.name}`} onClick={() => apply(changeEnemies(s, cat, u.id, -1))}><MinusIcon /></button>
-                        <button title="Add one" aria-label={`Add one ${u.name}`} onClick={() => apply(changeEnemies(s, cat, u.id, 1))} disabled={n >= u.count}><PlusIcon /></button>
-                      </div>
-                    </div>
-                    {openUnit === u.id && <UnitCard unit={u} abilities={cat.abilities} />}
-                  </li>
-                );
-              })}
-            {enemiesOnBoard(s) === 0 && <li className="muted center">No enemies on the board.</li>}
-          </ul>
-          <Dropdown
-            action
-            className="add-enemy"
-            value=""
-            placeholder="+ Add enemy by hand…"
-            ariaLabel="Add enemy by hand"
-            options={cat.units
-              .filter((u) => (s.inPlay[u.id] ?? 0) < u.count)
-              .map((u) => ({ value: u.id, label: `${u.name} (${u.count - (s.inPlay[u.id] ?? 0)} free)` }))}
-            onChange={(unitId) => apply(changeEnemies(s, cat, unitId, 1))}
-          />
-        </>
-      )}
 
       {tab === 'tiles' && (
         <ul className="list">
@@ -259,58 +273,6 @@ export function GamePage() {
               </li>
             );
           })}
-        </ul>
-      )}
-
-      {tab === 'objectives' && (
-        <ul className="list">
-          {s.placements.filter((p) => isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat) || locked.has(p.objectiveId)).map((p) => {
-            const o = cat.objectives.find((x) => x.id === p.objectiveId);
-            const isFound = found.has(p.objectiveId);
-            if (locked.has(p.objectiveId))
-              return (
-                <li key={p.objectiveId} className="card locked">
-                  <div className="row between">
-                    <strong>🔒 {o?.name}</strong>
-                    <small className="muted">requires “{objectiveName(o?.revealedBy)}”</small>
-                  </div>
-                  {o?.lockedFlavour?.trim() && <p className="flavour">{o.lockedFlavour.trim()}</p>}
-                  <small className="muted">On {tileName(p.tileId)}{p.markerLabel ? `, marker ${p.markerLabel}` : ''}</small>
-                  <p>{o?.lockedText?.trim() || 'It can’t be completed yet.'}</p>
-                </li>
-              );
-            const done = s.completedObjectives.includes(p.objectiveId);
-            return (
-              <li key={p.objectiveId} className={`card ${done ? 'done' : ''}`}>
-                <div className="row between">
-                  <strong>{o?.name}</strong>
-                  {isFound && (
-                    <label className="objective-check inline">
-                      <input type="checkbox" checked={done} onChange={() => apply(toggleObjective(s, cat, p.objectiveId))} />
-                      <span>Completed</span>
-                    </label>
-                  )}
-                </div>
-                {isFound ? (
-                  <>
-                    {o?.flavour?.trim() && <p className="flavour">{o.flavour.trim()}</p>}
-                    <small className="muted">On {tileName(p.tileId)}{p.markerLabel ? `, marker ${p.markerLabel}` : ''}</small>
-                    {o?.completion && <p>{o.completion}</p>}
-                  </>
-                ) : (
-                  <small className="muted">Not discovered yet — keep exploring.</small>
-                )}
-              </li>
-            );
-          })}
-          {hiddenCount > 0 && (
-            <li className="muted center small">
-              {hiddenCount === 1 ? '1 more objective is' : `${hiddenCount} more objectives are`} still hidden.
-            </li>
-          )}
-          {s.placements.length > 0 && s.completedObjectives.length === s.placements.length && (
-            <li className="card victory">All objectives complete — the heroes are victorious!</li>
-          )}
         </ul>
       )}
 

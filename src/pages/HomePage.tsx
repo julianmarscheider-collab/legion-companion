@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+import { restoreSampleData } from '../data/seed';
 
 export interface NavItem {
   to: string;
@@ -28,6 +31,18 @@ export const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
 ];
 
 export function HomePage() {
+  const { user } = useAuth();
+  const [restoreMsg, setRestoreMsg] = useState('');
+  const restore = async () => {
+    const ok = confirm(
+      'Restore the example content (Goblins, Goblin Caves, The Goblin Warren)?\n\n' +
+        'Example items are reset to their original version: changes you made to them are overwritten, and deleted examples come back. ' +
+        'Your own units, tiles, objectives, missions and games are not touched.',
+    );
+    if (!ok) return;
+    const r = await restoreSampleData(user!.id);
+    setRestoreMsg(`Example content restored: ${r.updated} reset, ${r.added} added.`);
+  };
   return (
     <div className="page">
       <Link to="/play" className="hero-play card">
@@ -52,8 +67,12 @@ export function HomePage() {
         <small className="muted">Everything behind the “?” icons, in one place</small>
       </Link>
       <p className="footer-links">
-        <Link to="/licenses">Licenses</Link>
+        <Link to="/licenses">Licenses</Link> ·{' '}
+        <button className="link-button" onClick={restore}>
+          Restore example content
+        </button>
       </p>
+      {restoreMsg && <p className="center muted" role="status">{restoreMsg}</p>}
     </div>
   );
 }
