@@ -1,6 +1,6 @@
 import { createHashRouter, NavLink, Outlet, RouterProvider } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
-import { GENERATORS, HomePage } from './pages/HomePage';
+import { HomePage, NAV_GROUPS } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RulesPage } from './pages/RulesPage';
 import { LicensesPage } from './pages/LicensesPage';
@@ -20,13 +20,19 @@ function Layout() {
           <img src="./icon.svg" alt="" /> <span className="brand-name">Legion<span className="brand-long"> Companion</span></span>
         </NavLink>
         <nav>
-          <NavLink to="/play">Play</NavLink>
-          <NavLink to="/rules">Rules</NavLink>
-          {GENERATORS.map((g) => (
-            <NavLink key={g.to} to={g.to} className="wide-only">
-              {g.label}
-            </NavLink>
+          <NavLink to="/play" className="nav-play">
+            ▶ Play
+          </NavLink>
+          {NAV_GROUPS.map((g) => (
+            <div key={g.title} className="nav-box wide-only" role="group" aria-label={g.title}>
+              {g.items.map((i) => (
+                <NavLink key={i.to} to={i.to}>
+                  {i.label}
+                </NavLink>
+              ))}
+            </div>
           ))}
+          <NavLink to="/rules">Rules</NavLink>
         </nav>
         <button className="ghost small" onClick={signOut} title={`Signed in as ${user.username}`}>
           Sign out
