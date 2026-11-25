@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { HelpTip } from '../../components/HelpTip';
 import { Dropdown } from '../../components/Dropdown';
@@ -7,7 +7,8 @@ import { TileThumb, UnitThumb } from '../../components/Thumbs';
 import { UnitCard } from '../../components/UnitCard';
 import { repos } from '../../data/repositories';
 import type { SavedGame } from '../../data/savedGame';
-import { changeEnemies, drawActivation, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, exploreTile, toggleObjective, type GameCatalog, type GameEvent, type GameSnapshot } from '../../game/engine';
+import { changeEnemies, drawActivation, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, exploreTile, toggleObjective, type GameSnapshot } from '../../game/engine';
+import { CardPile, isDrawnCard, PlayCard } from './Cards';
 import { describe } from './describe';
 
 const MAX_HISTORY = 200;
@@ -21,6 +22,37 @@ export function GamePage() {
   const [openUnit, setOpenUnit] = useState<string | null>(null);
   // Tile extra rules are shown by default; this holds the tiles the players collapsed.
   const [collapsedTiles, setCollapsedTiles] = useState<string[]>([]);
+
+  // Card draw animation: the drawn card flies from its pile to the table and flips face up.
+  const activationPile = useRef<HTMLDivElement>(null);
+  const tilePile = useRef<HTMLDivElement>(null);
+  const drawnCard = useRef<HTMLDivElement>(null);
+  const pendingFlip = useRef<{ from: DOMRect; logLength: number } | null>(null);
+  useLayoutEffect(() => {
+    const f = pendingFlip.current;
+    const el = drawnCard.current;
+    if (!f || !el || game?.snapshot.log.length !== f.logLength) return;
+    pendingFlip.current = null;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const to = el.getBoundingClientRect();
+    const dx = f.from.left + f.from.width / 2 - (to.left + to.width / 2);
+    const dy = f.from.top + f.from.height / 2 - (to.top + to.height / 2);
+    const scale = Math.min(1, f.from.width / to.width);
+    const timing = { duration: 750, easing: 'cubic-bezier(0.25, 0.8, 0.3, 1)' };
+    const EDGE = 0.55; // the card is edge-on here: switch from back to front
+    el.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px) scale(${scale}) rotateY(180deg)`, offset: 0 },
+        { transform: `translate(${dx * 0.35}px, ${dy * 0.35 - 30}px) scale(${(scale + 1) / 2}) rotateY(90deg)`, offset: EDGE },
+        { transform: 'none', offset: 1 },
+      ],
+      timing,
+    );
+    // Show the back for the first half and the front for the second, independent of 3D support.
+    const show = (o: number) => [{ opacity: o, offset: 0 }, { opacity: o, offset: EDGE }, { opacity: 1 - o, offset: EDGE }, { opacity: 1 - o, offset: 1 }];
+    el.querySelector('.face.back')?.animate(show(1), timing);
+    el.querySelector('.face.front')?.animate(show(0), timing);
+  }, [game]);
 
   useEffect(() => {
     repos.games.get(id!).then((g) => setGame(g ?? null));
@@ -37,6 +69,12 @@ export function GamePage() {
     const updated = { ...game, snapshot: next, history: [...game.history, s].slice(-MAX_HISTORY) };
     setGame(updated);
     repos.games.put(updated);
+  };
+  // Remember where the card comes from, then draw it; the layout effect animates it.
+  const draw = (pile: RefObject<HTMLDivElement | null>, action: () => GameSnapshot) => {
+    const from = pile.current?.getBoundingClientRect();
+    if (from) pendingFlip.current = { from, logLength: s.log.length + 1 };
+    apply(action());
   };
   const undo = () => {
     const prev = game.history[game.history.length - 1];
@@ -83,21 +121,46 @@ export function GamePage() {
         <Link to="/play" className="button ghost">Exit</Link>
       </header>
 
-      <section className="instructions">
-        {current.map((e, i) => <EventCard key={i} event={e} cat={cat} />)}
-      </section>
+      <section className="table">
+        <div className="card-stage" key={s.log.length}>
+          {current.map((e, i) => {
+            const drawn = isDrawnCard(e);
+            return (
+              <PlayCard
+                key={i}
+                event={e}
+                cat={cat}
+                small={!drawn && current.some(isDrawnCard)}
+                back={drawn ? (e.kind === 'tile' || e.kind === 'tileDeckEmpty' ? 'tiles' : 'activation') : undefined}
+                ref={drawn ? drawnCard : undefined}
+              />
+            );
+          })}
+        </div>
 
-      <div className="game-actions">
-        <button className="primary big" onClick={() => apply(drawActivation(s, config, cat))}>
-          Draw activation card
-        </button>
-        <button className="big" onClick={() => apply(exploreTile(s, cat))} disabled={s.tileDeck.length === 0}>
-          Explore new tile
-        </button>
-        <button className="ghost" onClick={undo} disabled={game.history.length === 0}>
+        <div className="piles">
+          <CardPile
+            ref={activationPile}
+            kind="activation"
+            label="Activation deck"
+            count={s.activationDeck.length}
+            note={s.activationDeck.length ? `${plural(s.activationDeck.length, 'card')} left` : 'Round over: draw to reshuffle'}
+            onDraw={() => draw(activationPile, () => drawActivation(s, config, cat))}
+          />
+          <CardPile
+            ref={tilePile}
+            kind="tiles"
+            label="Map tiles"
+            count={s.tileDeck.length}
+            note={s.tileDeck.length ? `${plural(s.tileDeck.length, 'tile')} left` : 'No tiles left'}
+            disabled={s.tileDeck.length === 0}
+            onDraw={() => draw(tilePile, () => exploreTile(s, cat))}
+          />
+        </div>
+        <button className="ghost undo" onClick={undo} disabled={game.history.length === 0}>
           ↶ Undo
         </button>
-      </div>
+      </section>
       <p className="muted small center">
         The game is saved automatically after every draw. How the activation deck works <HelpTip rule="activationDeck" />
       </p>
@@ -287,14 +350,3 @@ export function GamePage() {
   );
 }
 
-function EventCard({ event, cat }: { event: GameEvent; cat: GameCatalog }) {
-  const d = describe(event, cat);
-  const tile = d.tileId ? cat.tiles.find((t) => t.id === d.tileId) : undefined;
-  return (
-    <article className={`event card tone-${d.tone}`}>
-      <h2>{d.title}</h2>
-      {tile && <TileThumb tile={tile} size="large" />}
-      {d.lines.map((l, i) => <p key={i}>{l}</p>)}
-    </article>
-  );
-}
