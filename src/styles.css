@@ -279,3 +279,6 @@ p.tile-rules { margin: 0.5rem 0 0; }
 /* Help popups always use the text font, even when the "?" sits inside a heading */
 .help-pop { font-family: var(--font-body); font-size: 0.95rem; font-weight: normal; line-height: 1.45; letter-spacing: normal; text-transform: none; }
 .help-pop strong { font-weight: 700; }
+.warning { color: #f0b35a; margin: 0.3rem 0 0; }
+.start-badge { background: var(--green); margin-left: 0.4rem; }
+.start-tile-info { margin: 0; padding: 0.55rem 0.7rem; background: #1f1a14; border: 1px solid var(--border); border-radius: 8px; }

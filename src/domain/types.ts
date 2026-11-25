@@ -65,6 +65,8 @@ export interface MapTile extends Entity {
   description: string;
   photos: string[];
   markers: TileMarker[];
+  /** Starting tile: the heroes start here; it has no objective location. */
+  isStart?: boolean;
   /** Optional special rules for this tile, shown when it is drawn. */
   rules?: string;
 }

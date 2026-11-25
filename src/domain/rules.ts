@@ -195,7 +195,12 @@ export const RULES = {
   startTile: {
     section: 'Map',
     title: 'Starting tile',
-    text: 'Placed at the start of the game. The heroes start here.',
+    text: 'Placed at the start of the game; the heroes start here. It is the tile in the set that is marked as starting tile (under Map tiles). A map set should contain exactly one.',
+  },
+  startTileFlag: {
+    section: 'Map',
+    title: 'Starting tile',
+    text: 'Mark tiles the heroes can start on. A starting tile has no objective location, so objectives placed on “the objective location of a random tile” never go here. Put exactly one starting tile in each map set.',
   },
 
   // ---- Playing ----

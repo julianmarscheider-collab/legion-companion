@@ -7,6 +7,7 @@ import { TileThumb } from '../../components/Thumbs';
 import { factionsOf } from './UnitsPage';
 import { newEntity, repos } from '../../data/repositories';
 import { useCollection } from '../../data/useCollection';
+import { startTileIdOf, startTilesOf, startTileWarning } from '../../domain/mapSets';
 import { placementLabel } from '../../domain/objectives';
 import { abilityCostLabel, isMultiplier, unitPoints } from '../../domain/points';
 import type { Ability, CostType, EnemyList, MapSet, MapTile, Mission, Objective } from '../../domain/types';
@@ -244,6 +245,7 @@ function MapTileEditor({ value: t, onChange }: EditorProps<MapTile>) {
         <TextField label="Tile number / code" help="tileCode" value={t.code} onChange={(code) => onChange({ ...t, code })} placeholder="As printed on the tile" />
         <TextField label="Name" value={t.name} onChange={(name) => onChange({ ...t, name })} />
       </div>
+      <Checkbox label="Starting tile" help="startTileFlag" checked={!!t.isStart} onChange={(isStart) => onChange({ ...t, isStart })} />
       <TextField label="Collection" help="tileCollection" suggestions={collections} value={t.collection ?? ''} onChange={(collection) => onChange({ ...t, collection })} placeholder="e.g. Dungeon Core Set" />
       <PhotoField photos={t.photos} onChange={(photos) => onChange({ ...t, photos })} />
       <fieldset>
@@ -272,13 +274,15 @@ export function MapTilesPage() {
       intro="Your physical map tiles and the location markers printed on them."
       groups={{ label: 'collection', get: (t) => t.collection ?? '', emptyLabel: 'No collection' }}
       repo={repos.mapTiles}
-      create={(o) => ({ ...newEntity(o), name: '', code: '', collection: '', description: '', photos: [], markers: [], rules: '' })}
+      create={(o) => ({ ...newEntity(o), name: '', code: '', collection: '', isStart: false, description: '', photos: [], markers: [], rules: '' })}
       Editor={MapTileEditor}
       summary={(t) => (
         <div className="row gap">
           <TileThumb tile={t} zoom={false} />
           <div>
-            <strong>Tile {t.code} – {t.name}</strong><br />
+            <strong>Tile {t.code} – {t.name}</strong>
+            {t.isStart && <span className="badge start-badge">Start</span>}
+            <br />
             <small className="muted unit-meta">
               {t.collection && <i className="faction">{t.collection}</i>}
               <span>{t.markers.map((m) => `${m.label}: ${m.type}`).join(', ') || 'No markers'}</span>
@@ -300,7 +304,9 @@ function collectionsOf(tiles: MapTile[]): string[] {
 function MapSetEditor({ value: s, onChange }: EditorProps<MapSet>) {
   const tiles = useCollection(repos.mapTiles);
   const chosen = tiles.filter((t) => s.tileIds.includes(t.id));
-  const named = tiles.map((t) => ({ ...t, name: `Tile ${t.code} – ${t.name}` }));
+  const named = tiles.map((t) => ({ ...t, name: `Tile ${t.code} – ${t.name}${t.isStart ? ' (starting tile)' : ''}` }));
+  const startTile = tiles.find((t) => t.id === startTileIdOf(s, tiles));
+  const warning = startTileWarning(s, tiles);
   return (
     <div className="form">
       <TextField label="Name" value={s.name} onChange={(name) => onChange({ ...s, name })} />
@@ -333,19 +339,18 @@ function MapSetEditor({ value: s, onChange }: EditorProps<MapSet>) {
         </select>
       )}
       {chosen.length > 0 && (
-        <SelectField
-          label="Starting tile"
-          help="startTile"
-          value={s.startTileId}
-          onChange={(startTileId) => onChange({ ...s, startTileId })}
-          options={chosen.map((t) => ({ value: t.id, label: `Tile ${t.code} – ${t.name}` }))}
-        />
+        <div className="field">
+          <LabelText label="Starting tile" help="startTile" />
+          <p className="start-tile-info">{startTile ? `Tile ${startTile.code} – ${startTile.name}` : '—'}</p>
+          {warning && <p className="warning">⚠ {warning}</p>}
+        </div>
       )}
     </div>
   );
 }
 
 export function MapSetsPage() {
+  const tiles = useCollection(repos.mapTiles);
   return (
     <CrudPage
       title="Map sets"
@@ -354,7 +359,12 @@ export function MapSetsPage() {
       create={(o) => ({ ...newEntity(o), name: '', description: '', tileIds: [], startTileId: '' })}
       Editor={MapSetEditor}
       summary={(s) => (
-        <div><strong>{s.name}</strong><br /><small className="muted">{s.tileIds.length} tiles</small></div>
+        <div>
+          <strong>{s.name}</strong>
+          <br />
+          <small className="muted">{s.tileIds.length} tiles</small>
+          {startTilesOf(s, tiles).length > 1 && <small className="warning"> · ⚠ {startTilesOf(s, tiles).length} starting tiles</small>}
+        </div>
       )}
     />
   );

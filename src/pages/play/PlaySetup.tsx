@@ -7,6 +7,7 @@ import type { SavedGame } from '../../data/savedGame';
 import { useCollection } from '../../data/useCollection';
 import { DIFFICULTIES, type Difficulty, type EnemyList } from '../../domain/types';
 import { LabelText } from '../../components/HelpTip';
+import { startTileWarning } from '../../domain/mapSets';
 import { factionsOf } from '../generators/UnitsPage';
 import { createGame, pickRandom, type GameCatalog } from '../../game/engine';
 import { randomSeed } from '../../game/rng';
@@ -35,6 +36,8 @@ export function PlaySetup() {
   const [error, setError] = useState('');
 
   const factions = factionsOf(units);
+  const selectedSet = mapSets.find((m) => m.id === (mapSetId || mapSets[0]?.id));
+  const setWarning = selectedSet ? startTileWarning(selectedSet, tiles) : null;
   const listId = enemyListId || enemyLists[0]?.id || (factions[0] ? FACTION + factions[0] : '');
 
   /** A whole faction used as an enemy list. */
@@ -121,6 +124,7 @@ export function PlaySetup() {
           onChange={setMapSetId}
           options={[...mapSets.map((s) => ({ value: s.id, label: s.name })), { value: RANDOM, label: '🎲 Random map set' }]}
         />
+        {setWarning && <p className="warning">⚠ {setWarning}</p>}
         <NumberField label="Number of heroes" help="heroCount" min={1} max={8} value={heroCount} onChange={setHeroCount} />
         {error && <p className="error">{error}</p>}
         <button className="primary big" onClick={start}>Start game</button>

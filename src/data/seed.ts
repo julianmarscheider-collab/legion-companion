@@ -32,7 +32,7 @@ export async function seedSampleData(ownerId: string) {
 
   const tile = (code: string, name: string, markers: MapTile['markers'], rules = ''): MapTile => ({ ...e(), code, name, collection: 'Goblin Caves', description: '', photos: [], markers, rules });
   const tiles = [
-    tile('1', 'Entrance Hall', [{ label: 'A', type: 'Door' }]),
+    { ...tile('1', 'Entrance Hall', [{ label: 'A', type: 'Door' }]), isStart: true },
     tile('2', 'Guard Room', [{ label: 'A', type: 'Chest' }]),
     tile('3', 'Corridor', []),
     tile('4', 'Shrine', [{ label: 'A', type: 'Altar' }, { label: 'B', type: 'Chest' }]),

@@ -58,6 +58,22 @@ describe('engine', () => {
     }
   });
 
+  it('starts on the marked starting tile and never puts objective-location objectives on starting tiles', () => {
+    const t = [tile('a'), { ...tile('b'), isStart: true }, { ...tile('c'), isStart: true }, tile('d'), tile('e')];
+    const c: GameCatalog = {
+      ...cat,
+      tiles: t,
+      mapSet: { ...cat.mapSet, tileIds: t.map((x) => x.id), startTileId: 'a' }, // old manual choice is overridden by the mark
+      mission: { ...cat.mission, objectiveIds: ['r1', 'r2', 'r3'] },
+      objectives: ['r1', 'r2', 'r3'].map((id) => ({ ...meta, id, name: id, description: '', placement: 'tile' as const, markerType: '', setup: '', completion: '' })),
+    };
+    for (let seed = 0; seed < 30; seed++) {
+      const g = createGame(config, c, seed);
+      expect(g.tilesInPlay).toEqual(['b']);
+      for (const p of g.placements) expect(['a', 'd', 'e']).toContain(p.tileId);
+    }
+  });
+
   it('is deterministic for the same seed', () => {
     const run = () => {
       let g = createGame(config, cat, 7);

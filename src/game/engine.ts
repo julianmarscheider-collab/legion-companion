@@ -1,5 +1,6 @@
 // Pure game logic: no UI, no database. Every action takes a snapshot and
 // returns a new one, which makes save/load and undo trivial.
+import { startTileIdOf } from '../domain/mapSets';
 import { objectiveMarkerType } from '../domain/objectives';
 import { unitPoints } from '../domain/points';
 import type { Ability, Difficulty, EnemyList, MapSet, MapTile, Mission, Objective, Unit } from '../domain/types';
@@ -126,7 +127,9 @@ function placeObjectives(cat: GameCatalog, rng: Rng): Placement[] {
   const used = new Set<string>();
   const placements: Placement[] = [];
   const tiles = cat.tiles;
-  const nonStart = tiles.filter((t) => t.id !== cat.mapSet.startTileId);
+  // Starting tiles have no objective location.
+  const startId = startTileIdOf(cat.mapSet, cat.tiles);
+  const nonStart = tiles.filter((t) => t.id !== startId && !t.isStart);
   const objectives = cat.mission.objectiveIds
     .map((id) => cat.objectives.find((o) => o.id === id))
     .filter((o): o is Objective => !!o);
@@ -159,7 +162,7 @@ function placeObjectives(cat: GameCatalog, rng: Rng): Placement[] {
 
 export function createGame(config: GameConfig, cat: GameCatalog, seed: number): GameSnapshot {
   const rng = new Rng(seed);
-  const startTileId = cat.mapSet.startTileId || cat.mapSet.tileIds[0];
+  const startTileId = startTileIdOf(cat.mapSet, cat.tiles);
   const placements = placeObjectives(cat, rng);
   const tileDeck = rng.shuffle(cat.mapSet.tileIds.filter((id) => id !== startTileId));
   const activationDeck = buildActivationDeck(config, rng);
