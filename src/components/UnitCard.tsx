@@ -5,9 +5,9 @@ import type { Ability, Unit } from '../domain/types';
 /** Compact stats for lists: grey labels, bright values, spaced apart (no separators). */
 export function StatLine({ unit: u }: { unit: Unit }) {
   const stats: [string, string][] = [
-    ['Str', `${u.strength}+`],
+    ['Str', `${u.strength}`],
     ['Dmg', `${u.damage}`],
-    ['Def', `${u.defense}+${u.defenseType !== 'None' ? ` (${u.defenseType})` : ''}`],
+    ['Def', `${u.defense}${u.defenseType !== 'None' ? ` (${u.defenseType})` : ''}`],
     ['Spd', `${u.speed}`],
     ['Tgh', `${u.toughness}`],
   ];
@@ -44,9 +44,9 @@ export function UnitCard({ unit, abilities }: { unit: Unit; abilities: Ability[]
         <span className="points">{unitPoints(unit, abilities)} pts</span>
       </header>
       <dl className="stats">
-        <div><dt>Strength</dt><dd>{unit.strength}+</dd></div>
+        <div><dt>Strength</dt><dd>{unit.strength}</dd></div>
         <div><dt>Damage</dt><dd>{unit.damage}</dd></div>
-        <div><dt>Defense</dt><dd>{unit.defense}+</dd></div>
+        <div><dt>Defense</dt><dd>{unit.defense}</dd></div>
         <div><dt>Type</dt><dd>{unit.defenseType}</dd></div>
         <div><dt>Speed</dt><dd>{unit.speed}</dd></div>
         <div><dt>Toughness</dt><dd>{unit.toughness}</dd></div>
