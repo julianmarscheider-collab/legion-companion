@@ -28,12 +28,18 @@ export function GamePage() {
   const tilePile = useRef<HTMLDivElement>(null);
   const drawnCard = useRef<HTMLDivElement>(null);
   const pendingFlip = useRef<{ from: DOMRect; logLength: number } | null>(null);
+  // Card animations are on by default (part of the board game feel); players can switch them off.
+  const [animations, setAnimations] = useState(() => localStorage.getItem('tc.animations') !== 'off');
+  const toggleAnimations = () => {
+    localStorage.setItem('tc.animations', animations ? 'off' : 'on');
+    setAnimations(!animations);
+  };
   useLayoutEffect(() => {
     const f = pendingFlip.current;
     const el = drawnCard.current;
     if (!f || !el || game?.snapshot.log.length !== f.logLength) return;
     pendingFlip.current = null;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (!animations) return;
     const to = el.getBoundingClientRect();
     const dx = f.from.left + f.from.width / 2 - (to.left + to.width / 2);
     const dy = f.from.top + f.from.height / 2 - (to.top + to.height / 2);
@@ -52,7 +58,7 @@ export function GamePage() {
     const show = (o: number) => [{ opacity: o, offset: 0 }, { opacity: o, offset: EDGE }, { opacity: 1 - o, offset: EDGE }, { opacity: 1 - o, offset: 1 }];
     el.querySelector('.face.back')?.animate(show(1), timing);
     el.querySelector('.face.front')?.animate(show(0), timing);
-  }, [game]);
+  }, [game, animations]);
 
   useEffect(() => {
     repos.games.get(id!).then((g) => setGame(g ?? null));
@@ -157,9 +163,14 @@ export function GamePage() {
             onDraw={() => draw(tilePile, () => exploreTile(s, cat))}
           />
         </div>
-        <button className="ghost undo" onClick={undo} disabled={game.history.length === 0}>
-          ↶ Undo
-        </button>
+        <div className="table-controls">
+          <button className="ghost undo" onClick={undo} disabled={game.history.length === 0}>
+            ↶ Undo
+          </button>
+          <button className="ghost small" onClick={toggleAnimations} aria-pressed={animations}>
+            Animations: {animations ? 'on' : 'off'}
+          </button>
+        </div>
       </section>
       <p className="muted small center">
         The game is saved automatically after every draw. How the activation deck works <HelpTip rule="activationDeck" />

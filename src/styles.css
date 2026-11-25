@@ -382,3 +382,5 @@ p.tile-rules { margin: 0.5rem 0 0; }
 .table .undo { align-self: center; }
 @media (max-width: 420px) { .piles { gap: 1.5rem; } .pile-stack { width: 92px; height: 129px; } }
 .face.back { opacity: 0; }
+.table-controls { display: flex; gap: 1rem; align-items: center; justify-content: center; flex-wrap: wrap; }
+.table-controls .small { color: var(--muted); }
