@@ -7,7 +7,7 @@ import { TileThumb, UnitThumb } from '../../components/Thumbs';
 import { UnitCard } from '../../components/UnitCard';
 import { repos } from '../../data/repositories';
 import type { SavedGame } from '../../data/savedGame';
-import { changeEnemies, drawActivation, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, exploreTile, toggleObjective, type GameCatalog, type GameEvent, type GameSnapshot } from '../../game/engine';
+import { changeEnemies, drawActivation, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, exploreTile, toggleObjective, type GameCatalog, type GameEvent, type GameSnapshot } from '../../game/engine';
 import { describe } from './describe';
 
 const MAX_HISTORY = 200;
@@ -48,8 +48,10 @@ export function GamePage() {
 
   const current = s.log[s.log.length - 1] ?? [];
   const found = foundObjectives(s, cat);
-  const hiddenCount = s.placements.filter((p) => !isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat)).length;
-  const unfoundCount = s.placements.length - found.size - hiddenCount;
+  const locked = lockedObjectives(s, cat); // on the table, prerequisite not completed yet
+  const hiddenCount = s.placements.filter((p) => !isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat) && !locked.has(p.objectiveId)).length;
+  const unfoundCount = s.placements.length - found.size - locked.size - hiddenCount;
+  const objectiveName = (id?: string) => cat.objectives.find((x) => x.id === id)?.name ?? '';
   const tileName = (tid: string) => {
     const t = cat.tiles.find((x) => x.id === tid);
     return t ? `Tile ${t.code} – ${t.name}` : '?';
@@ -101,14 +103,24 @@ export function GamePage() {
       </p>
 
       {/* Found objectives, with a "Completed" checkbox right in the play area */}
-      {s.placements.some((p) => found.has(p.objectiveId)) && (
+      {s.placements.some((p) => found.has(p.objectiveId) || locked.has(p.objectiveId)) && (
         <section className="objective-checklist card">
           <h3>Objectives</h3>
           {s.placements
-            .filter((p) => found.has(p.objectiveId))
+            .filter((p) => found.has(p.objectiveId) || locked.has(p.objectiveId))
             .map((p) => {
               const o = cat.objectives.find((x) => x.id === p.objectiveId);
               const done = s.completedObjectives.includes(p.objectiveId);
+              if (locked.has(p.objectiveId))
+                return (
+                  <div key={p.objectiveId} className="objective-check locked">
+                    <span className="lock" aria-hidden="true">🔒</span>
+                    <span>
+                      {o?.name}
+                      <small className="muted"> · requires “{objectiveName(o?.revealedBy)}”</small>
+                    </span>
+                  </div>
+                );
               return (
                 <label key={p.objectiveId} className={`objective-check ${done ? 'done' : ''}`}>
                   <input type="checkbox" checked={done} onChange={() => apply(toggleObjective(s, cat, p.objectiveId))} />
@@ -209,9 +221,21 @@ export function GamePage() {
 
       {tab === 'objectives' && (
         <ul className="list">
-          {s.placements.filter((p) => isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat)).map((p) => {
+          {s.placements.filter((p) => isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat) || locked.has(p.objectiveId)).map((p) => {
             const o = cat.objectives.find((x) => x.id === p.objectiveId);
             const isFound = found.has(p.objectiveId);
+            if (locked.has(p.objectiveId))
+              return (
+                <li key={p.objectiveId} className="card locked">
+                  <div className="row between">
+                    <strong>🔒 {o?.name}</strong>
+                    <small className="muted">requires “{objectiveName(o?.revealedBy)}”</small>
+                  </div>
+                  {o?.lockedFlavour?.trim() && <p className="flavour">{o.lockedFlavour.trim()}</p>}
+                  <small className="muted">On {tileName(p.tileId)}{p.markerLabel ? `, marker ${p.markerLabel}` : ''}</small>
+                  <p>{o?.lockedText?.trim() || 'It can’t be completed yet.'}</p>
+                </li>
+              );
             const done = s.completedObjectives.includes(p.objectiveId);
             return (
               <li key={p.objectiveId} className={`card ${done ? 'done' : ''}`}>

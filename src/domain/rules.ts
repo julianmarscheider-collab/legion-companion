@@ -132,15 +132,30 @@ export const RULES = {
     text: 'The objective is hidden on a random tile marker of this type (e.g. Altar) and revealed when that tile is explored. If no tile in the map set has such a marker, it goes on the objective location of a random tile instead.',
     link: { to: '/tiles', label: 'Open map tiles' },
   },
+  questline: {
+    section: 'Objectives & missions',
+    title: 'Questline',
+    text: 'Groups objectives that belong together, e.g. a key and the prisoner it frees. Filter the Objectives list by questline, and add a whole questline to a mission in one go.',
+  },
   objectiveStart: {
     section: 'Objectives & missions',
     title: 'Start objective',
-    text: 'Start objectives are listed in the game’s Objectives tab from the beginning. Untick it to make an objective that is only revealed once another objective has been completed.',
+    text: 'Start objectives are available from the beginning. Untick it to give the objective a prerequisite: another objective that has to be completed first.',
   },
   objectiveRevealedBy: {
     section: 'Objectives & missions',
-    title: 'Revealed by',
-    text: 'This objective stays hidden until the chosen objective has been completed. Then it appears in the Objectives tab, and is announced as soon as its tile is explored (right away if that tile is already on the table). If the chosen objective is not part of the mission, this one counts as a start objective.',
+    title: 'Prerequisite',
+    text: 'The objective that must be completed first. Until then this objective is hidden. If its tile is explored before the prerequisite is completed, it is shown as locked, with the “prerequisite not fulfilled” texts, and can’t be completed yet. Completing the prerequisite unlocks it. If the prerequisite is not part of the mission, this objective counts as a start objective.',
+  },
+  objectiveLockedFlavour: {
+    section: 'Objectives & missions',
+    title: 'Flavour text (prerequisite not fulfilled)',
+    text: 'Story text shown in italics when the objective is found before its prerequisite is completed, e.g. a locked door the heroes can’t open yet.',
+  },
+  objectiveLockedText: {
+    section: 'Objectives & missions',
+    title: 'Text (prerequisite not fulfilled)',
+    text: 'What the players do when the objective is found before its prerequisite is completed, e.g. “Place the prisoner in the cell. The door is locked until the key is found.”',
   },
   objectiveFlavour: {
     section: 'Objectives & missions',

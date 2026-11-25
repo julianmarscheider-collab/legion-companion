@@ -35,6 +35,20 @@ export function describe(e: GameEvent, cat: GameCatalog): { title: string; lines
       ? [<em key={`${p.objectiveId}-flavour`} className="flavour">{o.flavour.trim()}</em>, setup]
       : [setup];
   };
+  // Found before its prerequisite is completed: the "not fulfilled" texts, marked as locked.
+  const lockedPlacement = (p: Placement, currentTile?: string): ReactNode[] => {
+    const o = cat.objectives.find((x) => x.id === p.objectiveId);
+    const pre = cat.objectives.find((x) => x.id === o?.revealedBy);
+    const onTile = p.tileId !== currentTile ? ` on ${tile(p.tileId)}` : '';
+    const where = p.markerLabel ? onTile + (onTile ? `, marker ${p.markerLabel}` : ` on marker ${p.markerLabel}`) : onTile;
+    const text = o?.lockedText?.trim() || 'It can’t be completed yet.';
+    return [
+      ...(o?.lockedFlavour?.trim() ? [<em key={`${p.objectiveId}-lflavour`} className="flavour">{o.lockedFlavour.trim()}</em>] : []),
+      <span key={`${p.objectiveId}-locked`} className="locked-objective">
+        🔒 Objective “{o?.name}”{where} is locked (requires “{pre?.name}”): {text}
+      </span>,
+    ];
+  };
 
   switch (e.kind) {
     case 'start':
@@ -47,6 +61,7 @@ export function describe(e: GameEvent, cat: GameCatalog): { title: string; lines
           ...tileRules(e.tileId),
           cat.mission.description,
           ...e.placements.flatMap((p) => placement(p, e.tileId)),
+          ...(e.locked ?? []).flatMap((p) => lockedPlacement(p, e.tileId)),
         ].filter(Boolean),
       };
     case 'round':
@@ -76,7 +91,10 @@ export function describe(e: GameEvent, cat: GameCatalog): { title: string; lines
         title: 'Explore',
         tone: 'info',
         tileId: e.tileId,
-        lines: [`Place ${tile(e.tileId)} where the heroes left the board.`, ...tileRules(e.tileId), ...e.placements.flatMap((p) => placement(p, e.tileId))],
+        lines: [`Place ${tile(e.tileId)} where the heroes left the board.`, ...tileRules(e.tileId),
+          ...e.placements.flatMap((p) => placement(p, e.tileId)),
+          ...(e.locked ?? []).flatMap((p) => lockedPlacement(p, e.tileId)),
+        ],
       };
     case 'tileDeckEmpty':
       return { title: 'Explore', tone: 'info', lines: ['There are no map tiles left to explore.'] };
@@ -94,7 +112,7 @@ export function describe(e: GameEvent, cat: GameCatalog): { title: string; lines
         tone: 'hero',
         lines: [
           o?.name ?? '',
-          ...(revealed.length ? [<strong key="new">New objective revealed!</strong>] : []),
+          ...(revealed.length ? [<strong key="new">{revealed.length === 1 ? 'Objective unlocked!' : 'Objectives unlocked!'}</strong>] : []),
           ...revealed.flatMap((p) => placement(p)),
         ],
       };

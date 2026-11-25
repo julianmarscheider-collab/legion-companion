@@ -37,13 +37,14 @@ export interface SpawnResult {
 }
 
 export type GameEvent =
-  | { kind: 'start'; tileId: string; placements: Placement[] }
+  /** `locked`: objectives on the tile whose prerequisite isn't completed yet. */
+  | { kind: 'start'; tileId: string; placements: Placement[]; locked?: Placement[] }
   | { kind: 'round'; round: number }
   | { kind: 'hero' }
   | { kind: 'activate'; tileIds: string[] }
   /** `replacedActivation`: an enemy activation card drawn while no enemies were on the board. */
   | { kind: 'spawn'; tileIds: string[]; spawns: SpawnResult[]; replacedActivation?: boolean }
-  | { kind: 'tile'; tileId: string; placements: Placement[] }
+  | { kind: 'tile'; tileId: string; placements: Placement[]; locked?: Placement[] }
   | { kind: 'tileDeckEmpty' }
   | { kind: 'enemiesChanged'; unitId: string; delta: number }
   /** `revealed`: objectives unlocked by completing this one whose tile is already explored. */
@@ -176,7 +177,16 @@ export function createGame(config: GameConfig, cat: GameCatalog, seed: number): 
     inPlay: {},
     placements,
     completedObjectives: [],
-    log: [[{ kind: 'start', tileId: startTileId, placements: placements.filter((p) => startFound.has(p.objectiveId)) }]],
+    log: [
+      [
+        {
+          kind: 'start',
+          tileId: startTileId,
+          placements: placements.filter((p) => startFound.has(p.objectiveId)),
+          locked: placements.filter((p) => p.tileId === startTileId && !startFound.has(p.objectiveId)),
+        },
+      ],
+    ],
   };
 }
 
@@ -257,7 +267,8 @@ export function exploreTile(s: GameSnapshot, cat: GameCatalog): GameSnapshot {
   if (s.tileDeck.length === 0) return { ...s, log: [...s.log, [{ kind: 'tileDeckEmpty' }]] };
   const [tileId, ...rest] = s.tileDeck;
   const next = { ...s, tileDeck: rest, tilesInPlay: [...s.tilesInPlay, tileId] };
-  return { ...next, log: [...s.log, [{ kind: 'tile', tileId, placements: newlyFound(s, next, cat) }]] };
+  const locked = s.placements.filter((p) => p.tileId === tileId && !isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat));
+  return { ...next, log: [...s.log, [{ kind: 'tile', tileId, placements: newlyFound(s, next, cat), locked }]] };
 }
 
 // ---- Objective chains ------------------------------------------------------
@@ -280,6 +291,16 @@ export function foundObjectives(s: Pick<GameSnapshot, 'placements' | 'tilesInPla
   return new Set(
     s.placements
       .filter((p) => inPlay.has(p.tileId) && isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat))
+      .map((p) => p.objectiveId),
+  );
+}
+
+/** Objectives found before their prerequisite was completed: on the table, but locked. */
+export function lockedObjectives(s: Pick<GameSnapshot, 'placements' | 'tilesInPlay' | 'completedObjectives'>, cat: GameCatalog): Set<string> {
+  const inPlay = new Set(s.tilesInPlay);
+  return new Set(
+    s.placements
+      .filter((p) => inPlay.has(p.tileId) && !isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat))
       .map((p) => p.objectiveId),
   );
 }

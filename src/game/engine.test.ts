@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MapTile, Unit } from '../domain/types';
-import { changeEnemies, createGame, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, toggleObjective, enemyCardCount, drawActivation, exploreTile, type GameCatalog, type GameConfig } from './engine';
+import { changeEnemies, createGame, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, toggleObjective, enemyCardCount, drawActivation, exploreTile, type GameCatalog, type GameConfig } from './engine';
 
 const meta = { ownerId: 'o', createdAt: 0, updatedAt: 0 };
 const unit = (id: string, over: Partial<Unit> = {}): Unit => ({
@@ -143,7 +143,9 @@ describe('engine', () => {
     let g = createGame(config, c, 1);
     g = { ...g, tileDeck: ['b', 'a'] }; // explore the cell tile first
     g = exploreTile(g, c);
-    expect(g.log[g.log.length - 1]).toEqual([{ kind: 'tile', tileId: 'b', placements: [] }]);
+    // The cell is found before the key: announced as locked, not yet usable.
+    expect(g.log[g.log.length - 1]).toEqual([{ kind: 'tile', tileId: 'b', placements: [], locked: [{ objectiveId: 'cell', tileId: 'b', markerLabel: 'B' }] }]);
+    expect(lockedObjectives(g, c).has('cell')).toBe(true);
     g = exploreTile(g, c); // key found, but cell still hidden until the key objective is completed
     const onTile = (g.log[g.log.length - 1][0] as { placements: { objectiveId: string }[] }).placements.map((p) => p.objectiveId);
     expect(onTile).toEqual(['key']);
@@ -151,6 +153,7 @@ describe('engine', () => {
     g = toggleObjective(g, c, 'key'); // completing the key reveals the cell, already on the table
     expect(g.log[g.log.length - 1][0]).toMatchObject({ kind: 'objective', completed: true, revealed: [{ objectiveId: 'cell', tileId: 'b' }] });
     expect(foundObjectives(g, c).has('cell')).toBe(true);
+    expect(lockedObjectives(g, c).has('cell')).toBe(false);
   });
 
   it('starts a new round when the activation deck runs out', () => {

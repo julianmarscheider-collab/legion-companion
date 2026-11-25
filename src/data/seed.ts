@@ -45,9 +45,27 @@ export async function seedSampleData(ownerId: string) {
   const objective = (name: string, markerType: string, flavour: string, setup: string, completion: string) => ({ ...e(), name, description: '', flavour, markerType, setup, completion });
   const shrine = objective('Desecrate the Shrine', 'Altar', 'Crude idols ring a blood-stained altar. The air hums with something old and hungry.', 'Place an objective token on the altar.', 'A hero ends their turn on the token and passes a 4+ roll.');
   const prisoner = objective('Rescue the Prisoner', 'Cell', 'From behind rusted bars, a weak voice calls out: “Please… get me out of here.”', 'Place a prisoner miniature in the cell.', 'A hero escorts the prisoner back to the entrance tile.');
-  const key = objective('Find the Rusty Key', 'Chest', 'Half-buried under bones and rags lies an iron-bound chest.', 'Place a chest token on the marker.', 'A hero opens the chest (action, 3+ roll).');
-  // The prisoner is only revealed once the key has been found.
-  Object.assign(prisoner, { isStart: false, revealedBy: key.id });
+  const key = {
+    ...objective(
+      'Search the Rubble',
+      '',
+      'Part of the ceiling has come down. Between the broken stones and splintered crates something metallic glints.',
+      'Place a rubble token on the objective location.',
+      'A hero next to the rubble spends an action searching it and rolls a 3+. On a success they find a rusty key: give that hero a key token.',
+    ),
+    placement: 'tile' as const,
+    questline: 'Prison Break',
+  };
+  // The prisoner needs the key from the rubble: until it is found the cell stays locked.
+  Object.assign(prisoner, {
+    questline: 'Prison Break',
+    isStart: false,
+    revealedBy: key.id,
+    setup: 'Place a prisoner miniature in the cell (if it isn’t there yet). The key fits the lock.',
+    completion: 'The hero carrying the key unlocks the cell (action), then escorts the prisoner back to the entrance tile.',
+    lockedFlavour: 'Behind a rusted iron door someone is calling for help. The lock is old, but it holds firm.',
+    lockedText: 'Place a prisoner miniature in the cell. The cell door is locked: it can’t be opened until a key is found.',
+  });
   const objectives = [shrine, prisoner, key];
 
   await Promise.all([
@@ -55,7 +73,7 @@ export async function seedSampleData(ownerId: string) {
     ...units.map((u) => repos.units.put(u)),
     ...tiles.map((t) => repos.mapTiles.put(t)),
     ...objectives.map((o) => repos.objectives.put(o)),
-    repos.missions.put({ ...e(), name: 'The Goblin Warren', description: 'Find the key, free the prisoner and desecrate the goblin shrine.', objectiveIds: [key.id, prisoner.id, shrine.id] }),
+    repos.missions.put({ ...e(), name: 'The Goblin Warren', description: 'Search the rubble for the key, free the prisoner and desecrate the goblin shrine.', objectiveIds: [key.id, prisoner.id, shrine.id] }),
     repos.enemyLists.put({ ...e(), name: 'Goblin Horde', description: '', unitIds: units.map((u) => u.id) }),
     repos.mapSets.put({ ...e(), name: 'Goblin Caves', description: '', tileIds: tiles.map((t) => t.id), startTileId: tiles[0].id }),
   ]);

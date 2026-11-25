@@ -9,7 +9,7 @@ import { factionsOf } from './UnitsPage';
 import { newEntity, repos } from '../../data/repositories';
 import { useCollection } from '../../data/useCollection';
 import { startTileIdOf, startTilesOf, startTileWarning } from '../../domain/mapSets';
-import { placementLabel } from '../../domain/objectives';
+import { placementLabel, questlinesOf } from '../../domain/objectives';
 import { abilityCostLabel, isMultiplier, unitPoints } from '../../domain/points';
 import type { Ability, CostType, EnemyList, MapSet, MapTile, Mission, Objective } from '../../domain/types';
 
@@ -143,19 +143,26 @@ function ObjectiveEditor({ value: o, onChange }: EditorProps<Objective>) {
   const isStart = o.isStart !== false;
   return (
     <div className="form">
-      <TextField label="Name" value={o.name} onChange={(name) => onChange({ ...o, name })} />
+      <div className="grid2">
+        <TextField label="Name" value={o.name} onChange={(name) => onChange({ ...o, name })} />
+        <TextField label="Questline" help="questline" suggestions={questlinesOf(objectives)} value={o.questline ?? ''} onChange={(questline) => onChange({ ...o, questline })} placeholder="e.g. Prison Break" />
+      </div>
       <Checkbox label="Start objective" help="objectiveStart" checked={isStart} onChange={(v) => onChange({ ...o, isStart: v })} />
       {!isStart && (
-        <SelectField
-          label="Revealed by"
-          help="objectiveRevealedBy"
-          value={o.revealedBy ?? ''}
-          onChange={(revealedBy) => onChange({ ...o, revealedBy })}
-          options={[
-            { value: '', label: '— choose an objective —' },
-            ...candidates.map((x) => ({ value: x.id, label: x.name || '(unnamed)' })),
-          ]}
-        />
+        <>
+          <SelectField
+            label="Prerequisite"
+            help="objectiveRevealedBy"
+            value={o.revealedBy ?? ''}
+            onChange={(revealedBy) => onChange({ ...o, revealedBy })}
+            options={[
+              { value: '', label: '— choose an objective —' },
+              ...candidates.map((x) => ({ value: x.id, label: x.name || '(unnamed)' })),
+            ]}
+          />
+          <TextArea label="Flavour text (prerequisite not fulfilled)" help="objectiveLockedFlavour" rows={3} value={o.lockedFlavour ?? ''} onChange={(lockedFlavour) => onChange({ ...o, lockedFlavour })} placeholder="e.g. Behind a locked iron door, someone calls for help…" />
+          <TextArea label="Text (prerequisite not fulfilled)" help="objectiveLockedText" rows={3} value={o.lockedText ?? ''} onChange={(lockedText) => onChange({ ...o, lockedText })} placeholder="e.g. The cell door is locked. It can't be opened until a key is found." />
+        </>
       )}
       <SelectField<'marker' | 'tile'>
         label="Placed on"
@@ -179,15 +186,25 @@ function ObjectiveEditor({ value: o, onChange }: EditorProps<Objective>) {
 }
 
 export function ObjectivesPage() {
+  const objectiveNames = new Map(useCollection(repos.objectives).map((o) => [o.id, o.name]));
   return (
     <CrudPage
       title="Objectives"
       intro="Objectives are hidden on a map tile marker and revealed when that tile is explored."
+      groups={{ label: 'questline', get: (o) => o.questline ?? '', emptyLabel: 'No questline' }}
       repo={repos.objectives}
-      create={(o) => ({ ...newEntity(o), name: '', description: '', flavour: '', placement: 'marker' as const, markerType: '', setup: '', completion: '', isStart: true, revealedBy: '' })}
+      create={(o) => ({ ...newEntity(o), name: '', questline: '', description: '', flavour: '', placement: 'marker' as const, markerType: '', setup: '', completion: '', isStart: true, revealedBy: '' })}
       Editor={ObjectiveEditor}
       summary={(o) => (
-        <div><strong>{o.name}</strong><br /><small className="muted">On: {placementLabel(o)}</small></div>
+        <div>
+          <strong>{o.name}</strong>
+          <br />
+          <small className="muted unit-meta">
+            {o.questline && <i className="faction">{o.questline}</i>}
+            <span>On: {placementLabel(o)}</span>
+            {o.isStart === false && o.revealedBy && <span>🔒 after “{objectiveNames.get(o.revealedBy) ?? '?'}”</span>}
+          </small>
+        </div>
       )}
     />
   );
@@ -210,6 +227,23 @@ function MissionEditor({ value: m, onChange }: EditorProps<Mission>) {
         extra={(o) => `(${placementLabel(o)})`}
         noItemsText="Create objectives first."
       />
+      {questlinesOf(objectives).length > 0 && (
+        <Dropdown
+          action
+          className="add-enemy"
+          value=""
+          placeholder="+ Add all objectives of a questline…"
+          ariaLabel="Add all objectives of a questline"
+          options={questlinesOf(objectives).map((q) => ({
+            value: q,
+            label: `${q} (${objectives.filter((o) => (o.questline ?? '').trim() === q).length} objectives)`,
+          }))}
+          onChange={(questline) => {
+            const add = objectives.filter((o) => (o.questline ?? '').trim() === questline && !m.objectiveIds.includes(o.id));
+            onChange({ ...m, objectiveIds: [...m.objectiveIds, ...add.map((o) => o.id)] });
+          }}
+        />
+      )}
     </div>
   );
 }

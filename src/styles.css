@@ -302,3 +302,7 @@ p.tile-rules { margin: 0.5rem 0 0; }
 .dropdown-option.selected { color: var(--gold); font-weight: 600; }
 .dropdown-empty { padding: 0.5rem 0.7rem; }
 .add-enemy.dropdown { margin-top: 0.5rem; }
+.objective-check.locked { cursor: default; color: var(--muted); }
+.objective-check.locked .lock { width: 22px; text-align: center; flex-shrink: 0; }
+.card.locked { border-style: dashed; }
+.locked-objective { display: block; color: var(--muted); }

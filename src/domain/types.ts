@@ -98,10 +98,16 @@ export interface Objective extends Entity {
   setup: string;
   /** How the objective is completed. */
   completion: string;
+  /** Groups linked objectives, e.g. "Prison Break". Empty = no questline. */
+  questline?: string;
   /** Start objectives are known from the beginning. Missing = true (objectives created before this existed). */
   isStart?: boolean;
-  /** For non-start objectives: the objective that must be found first. */
+  /** For non-start objectives: the prerequisite objective that must be completed first. */
   revealedBy?: string;
+  /** Flavour text shown if the objective is found before its prerequisite is completed. */
+  lockedFlavour?: string;
+  /** Instruction shown if the objective is found before its prerequisite is completed. */
+  lockedText?: string;
 }
 
 export interface Mission extends Entity {

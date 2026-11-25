@@ -5,6 +5,11 @@ export function objectiveMarkerType(o: Objective): string {
   return o.placement === 'tile' ? '' : o.markerType.trim();
 }
 
+/** All questline names used by these objectives, sorted. */
+export function questlinesOf(objectives: Objective[]): string[] {
+  return [...new Set(objectives.map((o) => (o.questline ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
+
 /** Short description of where an objective goes, e.g. "Altar marker" or "objective location". */
 export function placementLabel(o: Objective): string {
   const type = objectiveMarkerType(o);
