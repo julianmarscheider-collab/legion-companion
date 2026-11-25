@@ -69,7 +69,14 @@ export function describe(e: GameEvent, cat: GameCatalog): { title: string; lines
     case 'hero':
       return { title: 'Hero activation', tone: 'hero', lines: ['One hero with a ready activation token takes their turn.'] };
     case 'activate':
-      return { title: 'Enemy activation', tone: 'enemy', lines: e.tileIds.map((id) => `Activate all enemies on ${tile(id)}.`) };
+      return {
+        title: 'Enemy activation',
+        tone: 'enemy',
+        lines: [
+          ...(e.replacedSpawn ? [<em key="replaced">No miniatures left to spawn, so the spawn card activates a single tile instead.</em>] : []),
+          ...e.tileIds.map((id) => `Activate all enemies on ${tile(id)}.`),
+        ],
+      };
     case 'spawn': {
       const lines = e.tileIds.map((id) => {
         const here = e.spawns.filter((s) => s.tileId === id);

@@ -105,7 +105,9 @@ describe('engine', () => {
           let previous = '';
           for (let i = 0; i < 60; i++) {
             g = drawActivation(g, cfg, cat);
-            const card = g.log[g.log.length - 1].find((e) => e.kind !== 'round')!.kind;
+            const e = g.log[g.log.length - 1].find((x) => x.kind !== 'round')!;
+            // A spawn card that became a single-tile activation is still a spawn card in the deck.
+            const card = e.kind === 'activate' && e.replacedSpawn ? 'spawn' : e.kind;
             expect(previous === 'activate' && card === 'activate', `${difficulty} ${heroCount} ${seed}`).toBe(false);
             previous = card;
           }
@@ -154,6 +156,23 @@ describe('engine', () => {
     expect(g.log[g.log.length - 1][0]).toMatchObject({ kind: 'objective', completed: true, revealed: [{ objectiveId: 'cell', tileId: 'b' }] });
     expect(foundObjectives(g, c).has('cell')).toBe(true);
     expect(lockedObjectives(g, c).has('cell')).toBe(false);
+  });
+
+  it('turns a spawn into a single-tile activation when no miniatures are left', () => {
+    const cfg: GameConfig = { difficulty: 'Normal', heroCount: 2 };
+    for (let seed = 0; seed < 40; seed++) {
+      let g = createGame(cfg, cat, seed);
+      for (let i = 0; i < 4; i++) g = exploreTile(g, cat);
+      g = { ...g, inPlay: { rat: 6, boss: 1 } }; // every miniature is on the table
+      for (let i = 0; i < 12; i++) {
+        g = drawActivation(g, cfg, cat);
+        for (const e of g.log[g.log.length - 1]) {
+          expect(e.kind).not.toBe('spawn');
+          if (e.kind === 'activate' && e.replacedSpawn) expect(e.tileIds).toHaveLength(1);
+        }
+      }
+      expect(g.inPlay).toEqual({ rat: 6, boss: 1 });
+    }
   });
 
   it('starts a new round when the activation deck runs out', () => {

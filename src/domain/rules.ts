@@ -233,7 +233,7 @@ export const RULES = {
   activationDeck: {
     section: 'Playing',
     title: 'Activation deck',
-    text: 'Hero, enemy activation and spawn cards, reshuffled each round. Two enemy activation cards are never drawn back to back. If an enemy activation card is drawn while no enemies are on the board, it becomes a spawn card instead. Each enemy card activates all enemies on a third of the tiles in play (rounded up, e.g. 1 tile out of 1–3, 2 out of 4–6), chosen at random. Each spawn card spawns on a quarter of the tiles in play (rounded up, e.g. 1 tile out of 1–4, 2 out of 5–8).',
+    text: 'Hero, enemy activation and spawn cards, reshuffled each round. Two enemy activation cards are never drawn back to back. If an enemy activation card is drawn while no enemies are on the board, it becomes a spawn card instead. If a spawn card is drawn while no miniatures are left to spawn, it activates all enemies on a single random tile instead. Each enemy card activates all enemies on a third of the tiles in play (rounded up, e.g. 1 tile out of 1–3, 2 out of 4–6), chosen at random. Each spawn card spawns on a quarter of the tiles in play (rounded up, e.g. 1 tile out of 1–4, 2 out of 5–8).',
   },
 } satisfies Record<string, RuleEntry>;
 

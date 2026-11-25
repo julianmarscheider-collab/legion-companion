@@ -41,7 +41,8 @@ export type GameEvent =
   | { kind: 'start'; tileId: string; placements: Placement[]; locked?: Placement[] }
   | { kind: 'round'; round: number }
   | { kind: 'hero' }
-  | { kind: 'activate'; tileIds: string[] }
+  /** `replacedSpawn`: a spawn card drawn while no miniatures were left to spawn. */
+  | { kind: 'activate'; tileIds: string[]; replacedSpawn?: boolean }
   /** `replacedActivation`: an enemy activation card drawn while no enemies were on the board. */
   | { kind: 'spawn'; tileIds: string[]; spawns: SpawnResult[]; replacedActivation?: boolean }
   | { kind: 'tile'; tileId: string; placements: Placement[]; locked?: Placement[] }
@@ -213,6 +214,9 @@ export function drawActivation(s: GameSnapshot, config: GameConfig, cat: GameCat
     events.push({ kind: 'hero' });
   } else if (kind === 'enemy') {
     events.push({ kind: 'activate', tileIds: rng.sample(s.tilesInPlay, activationTileCount(s.tilesInPlay.length)) });
+  } else if (!canAnythingSpawn(inPlay, cat)) {
+    // No miniatures left to spawn: the spawn card activates the enemies on a single tile instead.
+    events.push({ kind: 'activate', tileIds: rng.sample(s.tilesInPlay, 1), replacedSpawn: true });
   } else {
     const tileIds = rng.sample(s.tilesInPlay, spawnTileCount(s.tilesInPlay.length));
     const spawns: SpawnResult[] = [];
@@ -226,6 +230,11 @@ export function drawActivation(s: GameSnapshot, config: GameConfig, cat: GameCat
 
 export function enemiesOnBoard(s: GameSnapshot): number {
   return Object.values(s.inPlay).reduce((sum, n) => sum + n, 0);
+}
+
+/** Is there any unit with enough free miniatures for at least its minimum spawn number? */
+export function canAnythingSpawn(inPlay: Record<string, number>, cat: GameCatalog): boolean {
+  return cat.units.some((u) => u.count - (inPlay[u.id] ?? 0) >= Math.max(1, u.spawn.minSpawn));
 }
 
 /** Mutates `inPlay`. Returns what to put on the tile. */
