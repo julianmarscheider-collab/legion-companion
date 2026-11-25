@@ -1,8 +1,23 @@
 import type { ReactNode } from 'react';
 import type { GameCatalog, GameEvent, Placement } from '../../game/engine';
 
+export interface TileRow {
+  tileId: string;
+  text: ReactNode;
+}
+
+export interface Described {
+  title: string;
+  tone: string;
+  /** Shown before the tile rows (e.g. why a card was replaced). */
+  notes?: ReactNode[];
+  /** One row per tile, shown with the tile's image or number. */
+  tileRows?: TileRow[];
+  lines: ReactNode[];
+}
+
 /** Turns engine events into instructions for the players. */
-export function describe(e: GameEvent, cat: GameCatalog): { title: string; lines: ReactNode[]; tone: string; tileId?: string } {
+export function describe(e: GameEvent, cat: GameCatalog): Described {
   const tile = (id: string) => {
     const t = cat.tiles.find((x) => x.id === id);
     return t ? `Tile ${t.code} (${t.name})` : 'Unknown tile';
@@ -55,9 +70,8 @@ export function describe(e: GameEvent, cat: GameCatalog): { title: string; lines
       return {
         title: 'Set up the game',
         tone: 'info',
-        tileId: e.tileId,
+        tileRows: [{ tileId: e.tileId, text: `Place the starting tile: ${tile(e.tileId)}. Heroes start here.` }],
         lines: [
-          `Place the starting tile: ${tile(e.tileId)}. Heroes start here.`,
           ...tileRules(e.tileId),
           cat.mission.description,
           ...e.placements.flatMap((p) => placement(p, e.tileId)),
@@ -72,33 +86,35 @@ export function describe(e: GameEvent, cat: GameCatalog): { title: string; lines
       return {
         title: 'Enemy activation',
         tone: 'enemy',
-        lines: [
-          ...(e.replacedSpawn ? [<em key="replaced">No miniatures left to spawn, so the spawn card activates a single tile instead.</em>] : []),
-          ...e.tileIds.map((id) => `Activate all enemies on ${tile(id)}.`),
-        ],
+        notes: e.replacedSpawn ? [<em key="replaced">No miniatures left to spawn, so the spawn card activates a single tile instead.</em>] : [],
+        tileRows: e.tileIds.map((id) => ({ tileId: id, text: `Activate all enemies on ${tile(id)}.` })),
+        lines: [],
       };
     case 'spawn': {
-      const lines = e.tileIds.map((id) => {
+      const tileRows = e.tileIds.map((id) => {
         const here = e.spawns.filter((s) => s.tileId === id);
-        return here.length
-          ? `${tile(id)}: spawn ${here.map((s) => `${s.count} × ${unit(s.unitId)}`).join(' and ')}.`
-          : `${tile(id)}: no miniatures available, nothing spawns.`;
+        return {
+          tileId: id,
+          text: here.length
+            ? `${tile(id)}: spawn ${here.map((s) => `${s.count} × ${unit(s.unitId)}`).join(' and ')}.`
+            : `${tile(id)}: no miniatures available, nothing spawns.`,
+        };
       });
       return {
         title: 'Spawn!',
         tone: 'spawn',
-        lines: [
-          ...(e.replacedActivation ? [<em key="replaced">No enemies on the board, so the enemy activation becomes a spawn.</em>] : []),
-          ...lines,
-        ],
+        notes: e.replacedActivation ? [<em key="replaced">No enemies on the board, so the enemy activation becomes a spawn.</em>] : [],
+        tileRows,
+        lines: [],
       };
     }
     case 'tile':
       return {
         title: 'Explore',
         tone: 'info',
-        tileId: e.tileId,
-        lines: [`Place ${tile(e.tileId)} where the heroes left the board.`, ...tileRules(e.tileId),
+        tileRows: [{ tileId: e.tileId, text: `Place ${tile(e.tileId)} where the heroes left the board.` }],
+        lines: [
+          ...tileRules(e.tileId),
           ...e.placements.flatMap((p) => placement(p, e.tileId)),
           ...(e.locked ?? []).flatMap((p) => lockedPlacement(p, e.tileId)),
         ],
@@ -125,4 +141,9 @@ export function describe(e: GameEvent, cat: GameCatalog): { title: string; lines
       };
     }
   }
+}
+
+/** Everything a description says, in reading order (for the plain-text log). */
+export function describedText(d: Described): ReactNode[] {
+  return [...(d.notes ?? []), ...(d.tileRows ?? []).map((r) => r.text), ...d.lines];
 }

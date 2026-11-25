@@ -388,3 +388,18 @@ p.tile-rules { margin: 0.5rem 0 0; }
   25%  { box-shadow: 0 0 0 3px #17120d, 0 0 0 4px #d9a441cc, 0 0 26px 6px #d9a44166, 0 12px 30px #000b; }
   100% { box-shadow: 0 0 0 3px #17120d, 0 0 0 4px #4a3d2e, 0 0 0 0 #d9a44100, 0 12px 30px #000b; }
 }
+
+/* Tile thumbnails: always a square with the tile number framed in the middle */
+.tile-thumb { position: relative; flex-shrink: 0; border-radius: 6px; overflow: hidden; }
+.tile-thumb.placeholder { background: var(--panel-2); border: 1px dashed var(--border); }
+.tile-thumb .tile-badge, .thumb.tile-thumb .tile-badge {
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  font-size: 1rem; min-width: 1.7em; padding: 0.05em 0.35em; border-color: #d9a44199;
+}
+.tile-small { width: 48px; height: 48px; }
+.tile-medium { width: 64px; height: 64px; }
+.tile-large { width: 112px; height: 112px; border-radius: 8px; }
+.tile-large .tile-badge { font-size: 1.35rem !important; }
+.zoomable.tile-thumb { padding: 0; border: none; }
+.tile-row-line { display: flex; align-items: center; gap: 0.9rem; margin: 0.45rem 0; }
+.tile-row-line p { margin: 0; }

@@ -36,11 +36,15 @@ function Zoomable({ src, caption, className, children }: { src: string; caption:
   );
 }
 
-/** Tile image with its number on top. Without an image: a placeholder showing the number. */
-export function TileThumb({ tile, size = 'small', zoom = true }: { tile: MapTile; size?: 'small' | 'large'; zoom?: boolean }) {
+/**
+ * Square tile thumbnail with the tile number in a framed badge in the middle.
+ * Without an image the badge sits on a plain square, so tiles always look alike.
+ * Sizes: small 48px (lists), medium 64px, large 112px (cards).
+ */
+export function TileThumb({ tile, size = 'small', zoom = true }: { tile: MapTile; size?: 'small' | 'medium' | 'large'; zoom?: boolean }) {
   const badge = <span className="tile-badge">{tile.code}</span>;
-  const cls = size === 'large' ? 'tile-thumb large' : 'thumb tile-thumb';
-  if (!tile.photos[0]) return size === 'large' ? null : <div className="thumb placeholder tile-code">{tile.code}</div>;
+  const cls = `tile-thumb tile-${size}`;
+  if (!tile.photos[0]) return <div className={`${cls} placeholder`}>{badge}</div>;
   // Inside clickable list rows: plain image (a button can't contain another button).
   if (!zoom)
     return (

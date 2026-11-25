@@ -32,13 +32,25 @@ export function CardBack({ kind }: { kind: 'activation' | 'tiles' }) {
 /** A face-up card for one game event. `glow`: just drawn, so it glows softly for a moment. */
 export function PlayCard({ event, cat, small, glow }: { event: GameEvent; cat: GameCatalog; small?: boolean; glow?: boolean }) {
   const d = describe(event, cat);
-  const tile = d.tileId ? cat.tiles.find((t) => t.id === d.tileId) : undefined;
+  // One tile (explore, setup): a bigger picture. Several (activation, spawn): compact rows.
+  const thumbSize = (d.tileRows?.length ?? 0) === 1 && (event.kind === 'tile' || event.kind === 'start') ? 'large' : 'medium';
   return (
     <article className={`play-card tone-${d.tone} ${small ? 'small' : ''} ${glow ? 'glow' : ''}`}>
       <header className="play-card-band">{TYPE_LABEL[event.kind]}</header>
       <div className="play-card-body">
         <h2>{d.title}</h2>
-        {tile && <TileThumb tile={tile} size="large" />}
+        {d.notes?.map((n, i) => (
+          <p key={`n${i}`}>{n}</p>
+        ))}
+        {d.tileRows?.map((r, i) => {
+          const tile = cat.tiles.find((t) => t.id === r.tileId);
+          return (
+            <div key={`t${i}`} className={`tile-row-line ${thumbSize}`}>
+              {tile && <TileThumb tile={tile} size={thumbSize} />}
+              <p>{r.text}</p>
+            </div>
+          );
+        })}
         {d.lines.map((l, i) => (
           <p key={i}>{l}</p>
         ))}

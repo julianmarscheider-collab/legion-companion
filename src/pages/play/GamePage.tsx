@@ -9,7 +9,7 @@ import { repos } from '../../data/repositories';
 import type { SavedGame } from '../../data/savedGame';
 import { changeEnemies, drawActivation, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, exploreTile, toggleObjective, type GameSnapshot } from '../../game/engine';
 import { CardPile, isDrawnCard, PlayCard } from './Cards';
-import { describe } from './describe';
+import { describe, describedText } from './describe';
 
 const MAX_HISTORY = 200;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -313,7 +313,7 @@ export function GamePage() {
             <li key={s.log.length - i}>
               {entry.map((e, j) => {
                 const d = describe(e, cat);
-                return <div key={j}><strong>{d.title}</strong>: {d.lines.map((l, k) => <span key={k}>{l} </span>)}</div>;
+                return <div key={j}><strong>{d.title}</strong>: {describedText(d).map((l, k) => <span key={k}>{l} </span>)}</div>;
               })}
             </li>
           ))}
