@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { HelpTip } from '../../components/HelpTip';
+import { Dropdown } from '../../components/Dropdown';
 import { MinusIcon, PlusIcon } from '../../components/Icons';
 import { TileThumb, UnitThumb } from '../../components/Thumbs';
 import { UnitCard } from '../../components/UnitCard';
@@ -163,21 +164,17 @@ export function GamePage() {
               })}
             {enemiesOnBoard(s) === 0 && <li className="muted center">No enemies on the board.</li>}
           </ul>
-          <select
+          <Dropdown
+            action
             className="add-enemy"
             value=""
-            aria-label="Add enemy by hand"
-            onChange={(e) => e.target.value && apply(changeEnemies(s, cat, e.target.value, 1))}
-          >
-            <option value="">+ Add enemy by hand…</option>
-            {cat.units
+            placeholder="+ Add enemy by hand…"
+            ariaLabel="Add enemy by hand"
+            options={cat.units
               .filter((u) => (s.inPlay[u.id] ?? 0) < u.count)
-              .map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name} ({u.count - (s.inPlay[u.id] ?? 0)} free)
-                </option>
-              ))}
-          </select>
+              .map((u) => ({ value: u.id, label: `${u.name} (${u.count - (s.inPlay[u.id] ?? 0)} free)` }))}
+            onChange={(unitId) => apply(changeEnemies(s, cat, unitId, 1))}
+          />
         </>
       )}
 

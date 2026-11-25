@@ -1,5 +1,6 @@
 import { CrudPage, type EditorProps } from '../../components/CrudPage';
 import { Checkbox, PickList, NumberField, SelectField, TextArea, TextField } from '../../components/fields';
+import { Dropdown } from '../../components/Dropdown';
 import { LabelText } from '../../components/HelpTip';
 import { PhotoField } from '../../components/PhotoField';
 import { MiniCount } from '../../components/UnitCard';
@@ -79,22 +80,18 @@ function EnemyListEditor({ value: l, onChange }: EditorProps<EnemyList>) {
         noItemsText="Create units first."
       />
       {factionsOf(units).length > 0 && (
-        <select
+        <Dropdown
+          action
           className="add-enemy"
           value=""
-          aria-label="Add all units of a faction"
-          onChange={(e) => {
-            const add = units.filter((u) => (u.faction ?? '').trim() === e.target.value && !l.unitIds.includes(u.id));
+          placeholder="+ Add all units of a faction…"
+          ariaLabel="Add all units of a faction"
+          options={factionsOf(units).map((f) => ({ value: f, label: f }))}
+          onChange={(faction) => {
+            const add = units.filter((u) => (u.faction ?? '').trim() === faction && !l.unitIds.includes(u.id));
             onChange({ ...l, unitIds: [...l.unitIds, ...add.map((u) => u.id)] });
           }}
-        >
-          <option value="">+ Add all units of a faction…</option>
-          {factionsOf(units).map((f) => (
-            <option key={f} value={f}>
-              {f}
-            </option>
-          ))}
-        </select>
+        />
       )}
     </div>
   );
@@ -320,23 +317,22 @@ function MapSetEditor({ value: s, onChange }: EditorProps<MapSet>) {
         noItemsText="Create map tiles first."
       />
       {collectionsOf(tiles).length > 0 && (
-        <select
+        <Dropdown
+          action
           className="add-enemy"
           value=""
-          aria-label="Add all tiles of a collection"
-          onChange={(e) => {
-            const add = tiles.filter((t) => (t.collection ?? '').trim() === e.target.value && !s.tileIds.includes(t.id));
+          placeholder="+ Add all tiles of a collection…"
+          ariaLabel="Add all tiles of a collection"
+          options={collectionsOf(tiles).map((c) => ({
+            value: c,
+            label: `${c} (${tiles.filter((t) => (t.collection ?? '').trim() === c).length} tiles)`,
+          }))}
+          onChange={(collection) => {
+            const add = tiles.filter((t) => (t.collection ?? '').trim() === collection && !s.tileIds.includes(t.id));
             const tileIds = [...s.tileIds, ...add.map((t) => t.id)];
             onChange({ ...s, tileIds, startTileId: s.startTileId || (tileIds[0] ?? '') });
           }}
-        >
-          <option value="">+ Add all tiles of a collection…</option>
-          {collectionsOf(tiles).map((c) => (
-            <option key={c} value={c}>
-              {c} ({tiles.filter((t) => (t.collection ?? '').trim() === c).length} tiles)
-            </option>
-          ))}
-        </select>
+        />
       )}
       {chosen.length > 0 && (
         <div className="field">

@@ -6,6 +6,7 @@ import { newEntity, repos } from '../../data/repositories';
 import type { SavedGame } from '../../data/savedGame';
 import { useCollection } from '../../data/useCollection';
 import { DIFFICULTIES, type Difficulty, type EnemyList } from '../../domain/types';
+import { Dropdown } from '../../components/Dropdown';
 import { LabelText } from '../../components/HelpTip';
 import { startTileWarning } from '../../domain/mapSets';
 import { factionsOf } from '../generators/UnitsPage';
@@ -96,26 +97,19 @@ export function PlaySetup() {
         />
         <div className="field">
           <LabelText label="Enemies" help="faction" htmlFor="enemies-select" />
-          <select id="enemies-select" value={listId} onChange={(e) => setEnemyListId(e.target.value)}>
-            {enemyLists.length > 0 && (
-              <optgroup label="Enemy lists">
-                {enemyLists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {factions.length > 0 && (
-              <optgroup label="Whole factions">
-                {factions.map((f) => (
-                  <option key={f} value={FACTION + f}>
-                    All {f} ({plural(units.filter((u) => (u.faction ?? '').trim() === f).length, 'unit')})
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
+          <Dropdown
+            id="enemies-select"
+            value={listId}
+            onChange={setEnemyListId}
+            options={[
+              ...enemyLists.map((l) => ({ value: l.id, label: l.name, group: 'Enemy lists' })),
+              ...factions.map((f) => ({
+                value: FACTION + f,
+                label: `All ${f} (${plural(units.filter((u) => (u.faction ?? '').trim() === f).length, 'unit')})`,
+                group: 'Whole factions',
+              })),
+            ]}
+          />
         </div>
         <SelectField<Difficulty> label="Difficulty" help="difficulty" value={difficulty} onChange={setDifficulty} options={DIFFICULTIES.map((d) => ({ value: d, label: d }))} />
         <SelectField

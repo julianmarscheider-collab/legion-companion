@@ -3,6 +3,7 @@ import { useId, type ReactNode } from 'react';
 import type { RuleKey } from '../domain/rules';
 import { HelpTip, LabelText } from './HelpTip';
 import { SuggestInput } from './SuggestInput';
+import { Dropdown } from './Dropdown';
 
 export { PickList } from './PickList';
 
@@ -67,13 +68,7 @@ export function SelectField<T extends string>(p: {
   return (
     <div className="field">
       <LabelText label={p.label} help={p.help} htmlFor={id} />
-      <select id={id} value={p.value} onChange={(e) => p.onChange(e.target.value as T)}>
-        {p.options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
+      <Dropdown id={id} value={p.value} onChange={(v) => p.onChange(v as T)} options={p.options} />
     </div>
   );
 }
