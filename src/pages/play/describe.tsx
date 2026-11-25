@@ -23,12 +23,14 @@ export function describe(e: GameEvent, cat: GameCatalog): { title: string; lines
   const placement = (p: Placement, currentTile?: string): ReactNode[] => {
     const o = cat.objectives.find((x) => x.id === p.objectiveId);
     const onTile = p.tileId !== currentTile ? ` on ${tile(p.tileId)}` : '';
+    // Without a marker the objective goes on the tile's printed objective location.
     const where = p.markerLabel
       ? onTile + (onTile ? `, marker ${p.markerLabel}` : ` on marker ${p.markerLabel}`)
       : onTile
-        ? ` anywhere${onTile}`
-        : ' anywhere on this tile';
-    const setup = `Objective “${o?.name}”${where}: ${o?.setup || 'place the objective.'}`;
+        ? ` on the objective location of ${tile(p.tileId)}`
+        : ' on the objective location of this tile';
+    const fallback = p.markerLabel ? 'place an objective marker there.' : 'place an objective marker on the objective location.';
+    const setup = `Objective “${o?.name}”${where}: ${o?.setup || fallback}`;
     return o?.flavour?.trim()
       ? [<em key={`${p.objectiveId}-flavour`} className="flavour">{o.flavour.trim()}</em>, setup]
       : [setup];

@@ -166,7 +166,7 @@ function ObjectiveEditor({ value: o, onChange }: EditorProps<Objective>) {
         onChange={(placement) => onChange({ ...o, placement })}
         options={[
           { value: 'marker', label: 'A marker of a certain type' },
-          { value: 'tile', label: 'A random tile (anywhere on it)' },
+          { value: 'tile', label: 'The objective location of a random tile' },
         ]}
       />
       {o.placement !== 'tile' && (

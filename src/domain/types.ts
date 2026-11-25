@@ -86,9 +86,9 @@ export interface MapSet extends Entity {
 export interface Objective extends Entity {
   name: string;
   description: string;
-  /** 'marker' (default): on a random marker of `markerType`. 'tile': anywhere on a random tile. */
+  /** 'marker' (default): on a random marker of `markerType`. 'tile': on the objective location of a random tile. */
   placement?: 'marker' | 'tile';
-  /** Marker type the objective is placed on. Empty = place anywhere on a random tile. */
+  /** Marker type the objective is placed on. Empty = the objective location of a random tile. */
   markerType: string;
   /** Story text read out when the objective is discovered (shown in italics). */
   flavour?: string;
