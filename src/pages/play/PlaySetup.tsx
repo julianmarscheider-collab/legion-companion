@@ -5,7 +5,8 @@ import { NumberField, SelectField } from '../../components/fields';
 import { newEntity, repos } from '../../data/repositories';
 import type { SavedGame } from '../../data/savedGame';
 import { useCollection } from '../../data/useCollection';
-import { DIFFICULTIES, type Difficulty, type EnemyList } from '../../domain/types';
+import { BUILTIN_DIFFICULTIES, type EnemyList } from '../../domain/types';
+import { DifficultyPicker, type ChosenDifficulty } from './DifficultyPicker';
 import { Dropdown } from '../../components/Dropdown';
 import { LabelText } from '../../components/HelpTip';
 import { startTileWarning } from '../../domain/mapSets';
@@ -32,7 +33,8 @@ export function PlaySetup() {
   const [missionId, setMissionId] = useState(RANDOM);
   const [enemyListId, setEnemyListId] = useState('');
   const [mapSetId, setMapSetId] = useState('');
-  const [difficulty, setDifficulty] = useState<Difficulty>('Normal');
+  const [difficultyChoice, setDifficultyChoice] = useState('Normal');
+  const [difficulty, setDifficulty] = useState<ChosenDifficulty>({ name: 'Normal', settings: BUILTIN_DIFFICULTIES.Normal });
   const [heroCount, setHeroCount] = useState(2);
   const [error, setError] = useState('');
 
@@ -77,10 +79,10 @@ export function PlaySetup() {
           objectives.some((o) => mission.objectiveIds.includes(o.id) && (o.summonBossId === u.id || o.defeatBossId === u.id)),
       ),
     };
-    const config = { difficulty, heroCount };
+    const config = { difficulty: difficulty.name, heroCount, settings: difficulty.settings };
     const game: SavedGame = {
       ...newEntity(user!.id),
-      name: `${mission.name} (${difficulty})`,
+      name: `${mission.name} (${difficulty.name})`,
       config,
       catalog,
       snapshot: createGame(config, catalog, randomSeed()),
@@ -117,7 +119,13 @@ export function PlaySetup() {
             ]}
           />
         </div>
-        <SelectField<Difficulty> label="Difficulty" help="difficulty" value={difficulty} onChange={setDifficulty} options={DIFFICULTIES.map((d) => ({ value: d, label: d }))} />
+        <DifficultyPicker
+          value={difficultyChoice}
+          onChange={(choice, chosen) => {
+            setDifficultyChoice(choice);
+            setDifficulty(chosen);
+          }}
+        />
         <SelectField
           label="Map tile set"
           value={setId}

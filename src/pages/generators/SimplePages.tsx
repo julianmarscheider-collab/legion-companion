@@ -1,6 +1,8 @@
 import { CrudPage, type EditorProps } from '../../components/CrudPage';
 import { Checkbox, PickList, NumberField, SelectField, TextArea, TextField } from '../../components/fields';
 import { Dropdown } from '../../components/Dropdown';
+import { StatDependencyEditor } from '../../components/StatDependencyEditor';
+import { CrownIcon } from '../../components/Icons';
 import { LabelText } from '../../components/HelpTip';
 import { PhotoField } from '../../components/PhotoField';
 import { MiniCount } from '../../components/UnitCard';
@@ -27,7 +29,7 @@ function AbilityEditor({ value: a, onChange }: EditorProps<Ability>) {
     <div className="form">
       <div className="grid2">
         <TextField label="Name" value={a.name} onChange={(name) => onChange({ ...a, name })} />
-        <TextField label="Collection" help="abilityCollection" suggestions={abilityCollectionsOf(all)} value={a.collection ?? ''} onChange={(collection) => onChange({ ...a, collection })} placeholder="e.g. Goblin Warlord" />
+        <TextField label="Collection" help="abilityCollection" suggestions={abilityCollectionsOf(all)} value={a.collection ?? ''} onChange={(collection) => onChange({ ...a, collection })} placeholder={a.bossCard ? 'e.g. Goblin Warlord' : 'e.g. Undead'} />
       </div>
       <Checkbox label="Boss deck card" help="bossCard" checked={!!a.bossCard} onChange={(bossCard) => onChange({ ...a, bossCard })} />
       {!a.bossCard && (
@@ -40,9 +42,12 @@ function AbilityEditor({ value: a, onChange }: EditorProps<Ability>) {
             options={[
               { value: 'add', label: 'Additive: + points' },
               { value: 'multiply', label: 'Multiplicative: × unit points' },
+              { value: 'dependent', label: 'Dependent on stats' },
             ]}
           />
-          {isMultiplier(a) ? (
+          {a.costType === 'dependent' ? (
+            <StatDependencyEditor value={a.dependsOn ?? []} onChange={(dependsOn) => onChange({ ...a, dependsOn })} />
+          ) : isMultiplier(a) ? (
             <NumberField label="Multiplier" help="abilityMultiplier" min={0} max={10} step={0.05} value={a.multiplier ?? 1} onChange={(multiplier) => onChange({ ...a, multiplier })} />
           ) : (
             <NumberField label="Points" help="abilityPoints" min={-100} max={500} value={a.points} onChange={(points) => onChange({ ...a, points })} />
@@ -272,7 +277,11 @@ export function ObjectivesPage() {
             {o.questline && <i className="faction">{o.questline}</i>}
             <span>On: {placementLabel(o)}</span>
             {o.isStart === false && o.revealedBy && <span>🔒 after “{objectiveNames.get(o.revealedBy) ?? '?'}”</span>}
-            {o.summonBossId && <span>♛ summons a boss</span>}
+            {o.summonBossId && (
+              <span className="with-icon">
+                <CrownIcon /> summons a boss
+              </span>
+            )}
           </small>
         </div>
       )}

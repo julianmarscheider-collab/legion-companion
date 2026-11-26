@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Ability, EnemyList, MapSet, MapTile, Mission, Objective, Unit } from '../domain/types';
+import type { Ability, DifficultyPreset, EnemyList, MapSet, MapTile, Mission, Objective, Unit } from '../domain/types';
 import type { SavedGame } from './savedGame';
 
 export interface UserRecord {
@@ -22,6 +22,7 @@ export class LocalDb extends Dexie {
   mapTiles!: Table<MapTile, string>;
   mapSets!: Table<MapSet, string>;
   games!: Table<SavedGame, string>;
+  difficultyPresets!: Table<DifficultyPreset, string>;
 
   constructor() {
     // Internal database name: kept from the app's earlier name so existing data stays.
@@ -37,6 +38,8 @@ export class LocalDb extends Dexie {
       mapSets: 'id, ownerId',
       games: 'id, ownerId',
     });
+    // v2: difficulty presets saved by the player
+    this.version(2).stores({ difficultyPresets: 'id, ownerId' });
   }
 }
 

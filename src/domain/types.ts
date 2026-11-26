@@ -11,7 +11,25 @@ export interface Entity {
 export type DefenseType = 'None' | 'Evasive' | 'Armored';
 export const DEFENSE_TYPES: DefenseType[] = ['None', 'Evasive', 'Armored'];
 
-export type CostType = 'add' | 'multiply';
+export type CostType = 'add' | 'multiply' | 'dependent';
+
+/** Unit stats an ability's cost can depend on. */
+export type StatKey = 'strength' | 'attacks' | 'damage' | 'defense' | 'toughness' | 'wounds' | 'speed';
+export const STAT_LABELS: Record<StatKey, string> = {
+  strength: 'Strength',
+  attacks: 'Attacks',
+  damage: 'Damage',
+  defense: 'Defense',
+  toughness: 'Toughness',
+  wounds: 'Wounds',
+  speed: 'Speed',
+};
+
+/** One term of a dependent cost: the unit's stat value × factor. */
+export interface StatDependency {
+  stat: StatKey;
+  factor: number;
+}
 
 export interface Ability extends Entity {
   name: string;
@@ -24,6 +42,8 @@ export interface Ability extends Entity {
   costType?: CostType;
   points: number;
   multiplier?: number;
+  /** 'dependent': points = sum of (unit stat × factor). */
+  dependsOn?: StatDependency[];
 }
 
 export interface Unit extends Entity {
@@ -147,4 +167,28 @@ export interface Mission extends Entity {
 }
 
 export type Difficulty = 'Easy' | 'Normal' | 'Hard' | 'Nightmare';
+
+/** Everything a difficulty level changes. */
+export interface DifficultySettings {
+  /** × spawn budget (how many enemies a spawn places). */
+  budget: number;
+  /** Enemy activation cards per round = heroes × this (rounded, at least 1). */
+  enemyCardsPerHero: number;
+  /** Spawn cards per round. */
+  spawnCards: number;
+  /** Size of the spawn on a newly explored tile, as a share of a normal spawn. */
+  exploreSpawn: number;
+}
+
+/** A difficulty saved by the player for later games. */
+export interface DifficultyPreset extends Entity, DifficultySettings {
+  name: string;
+}
+
+export const BUILTIN_DIFFICULTIES: Record<Difficulty, DifficultySettings> = {
+  Easy: { budget: 0.75, enemyCardsPerHero: 0.75, spawnCards: 1, exploreSpawn: 0.5 },
+  Normal: { budget: 1, enemyCardsPerHero: 1, spawnCards: 1, exploreSpawn: 0.5 },
+  Hard: { budget: 1.3, enemyCardsPerHero: 1.25, spawnCards: 2, exploreSpawn: 0.5 },
+  Nightmare: { budget: 1.6, enemyCardsPerHero: 1.5, spawnCards: 2, exploreSpawn: 0.5 },
+};
 export const DIFFICULTIES: Difficulty[] = ['Easy', 'Normal', 'Hard', 'Nightmare'];

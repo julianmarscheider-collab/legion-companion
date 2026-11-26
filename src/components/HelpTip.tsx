@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { QuestionIcon } from './Icons';
 import { RULES, type RuleEntry, type RuleKey } from '../domain/rules';
 
 /** Small "?" next to a field. Hover (or tap on a phone) shows its rules text. */
@@ -72,7 +73,7 @@ export function HelpTip({ rule }: { rule: RuleKey }) {
           else setOpen((o) => !o);
         }}
       >
-        ?
+        <QuestionIcon />
       </button>
       {open && (
         <div

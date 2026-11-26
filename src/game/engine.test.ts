@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { MapTile, Unit } from '../domain/types';
+import { BUILTIN_DIFFICULTIES, type MapTile, type Unit } from '../domain/types';
 import { canRedrawTile, changeEnemies, createGame, redrawTile, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, toggleObjective, enemyCardCount, drawActivation, exploreTile, type GameCatalog, type GameConfig } from './engine';
 
 const meta = { ownerId: 'o', createdAt: 0, updatedAt: 0 };
@@ -33,10 +33,11 @@ describe('engine', () => {
   });
 
   it('scales enemy cards with heroes and difficulty', () => {
-    expect(enemyCardCount(4, 'Normal')).toBe(4);
-    expect(enemyCardCount(4, 'Nightmare')).toBeGreaterThan(enemyCardCount(4, 'Normal'));
-    expect(enemyCardCount(4, 'Easy')).toBeLessThan(enemyCardCount(4, 'Normal'));
-    expect(enemyCardCount(1, 'Easy')).toBe(1);
+    const D = BUILTIN_DIFFICULTIES;
+    expect(enemyCardCount(4, D.Normal)).toBe(4);
+    expect(enemyCardCount(4, D.Nightmare)).toBeGreaterThan(enemyCardCount(4, D.Normal));
+    expect(enemyCardCount(4, D.Easy)).toBeLessThan(enemyCardCount(4, D.Normal));
+    expect(enemyCardCount(1, D.Easy)).toBe(1);
   });
 
   it('puts random-tile objectives on a non-start tile without a marker, spreading them out', () => {
@@ -85,7 +86,7 @@ describe('engine', () => {
 
   it('never spawns more miniatures than owned and respects min spawn', () => {
     let g = createGame(config, cat, 1);
-    for (let i = 0; i < 4; i++) g = exploreTile(g, cat);
+    for (let i = 0; i < 4; i++) g = exploreTile(g, cat, config);
     for (let i = 0; i < 200; i++) {
       g = drawActivation(g, config, cat);
       expect(g.inPlay.rat ?? 0).toBeLessThanOrEqual(6);
@@ -144,11 +145,11 @@ describe('engine', () => {
     };
     let g = createGame(config, c, 1);
     g = { ...g, tileDeck: ['b', 'a'] }; // explore the cell tile first
-    g = exploreTile(g, c);
+    g = exploreTile(g, c, config);
     // The cell is found before the key: announced as locked, not yet usable.
-    expect(g.log[g.log.length - 1]).toEqual([{ kind: 'tile', tileId: 'b', placements: [], locked: [{ objectiveId: 'cell', tileId: 'b', markerLabel: 'Cell' }] }]);
+    expect(g.log[g.log.length - 1]).toMatchObject([{ kind: 'tile', tileId: 'b', placements: [], locked: [{ objectiveId: 'cell', tileId: 'b', markerLabel: 'Cell' }] }]);
     expect(lockedObjectives(g, c).has('cell')).toBe(true);
-    g = exploreTile(g, c); // key found, but cell still hidden until the key objective is completed
+    g = exploreTile(g, c, config); // key found, but cell still hidden until the key objective is completed
     const onTile = (g.log[g.log.length - 1][0] as { placements: { objectiveId: string }[] }).placements.map((p) => p.objectiveId);
     expect(onTile).toEqual(['key']);
     expect(isObjectiveUnlocked('cell', g.completedObjectives, c)).toBe(false);
@@ -162,7 +163,7 @@ describe('engine', () => {
     const cfg: GameConfig = { difficulty: 'Normal', heroCount: 2 };
     for (let seed = 0; seed < 40; seed++) {
       let g = createGame(cfg, cat, seed);
-      for (let i = 0; i < 4; i++) g = exploreTile(g, cat);
+      for (let i = 0; i < 4; i++) g = exploreTile(g, cat, config);
       g = { ...g, inPlay: { rat: 6, boss: 1 } }; // every miniature is on the table
       for (let i = 0; i < 12; i++) {
         g = drawActivation(g, cfg, cat);
@@ -178,10 +179,10 @@ describe('engine', () => {
   it('redraws an illegal tile: back into the deck (not on top) and a new tile drawn', () => {
     for (let seed = 0; seed < 30; seed++) {
       let g = createGame(config, cat, seed);
-      g = exploreTile(g, cat);
+      g = exploreTile(g, cat, config);
       const first = g.tilesInPlay[1];
       expect(canRedrawTile(g)).toBe(true);
-      g = redrawTile(g, cat);
+      g = redrawTile(g, cat, config);
       const second = g.tilesInPlay[1];
       expect(second).not.toBe(first);
       expect(g.tilesInPlay).toHaveLength(2);
@@ -191,7 +192,7 @@ describe('engine', () => {
     }
     // nothing to swap with when the deck is empty, and only right after exploring
     let g = createGame(config, cat, 1);
-    while (g.tileDeck.length) g = exploreTile(g, cat);
+    while (g.tileDeck.length) g = exploreTile(g, cat, config);
     expect(canRedrawTile(g)).toBe(false);
     g = drawActivation(createGame(config, cat, 2), config, cat);
     expect(canRedrawTile(g)).toBe(false);
@@ -237,7 +238,7 @@ describe('engine', () => {
     const prep = (seed: number) => {
       let g = createGame(config, c, seed);
       g = { ...g, tileDeck: ['a', 'b', 'c', 'd'] };
-      for (let i = 0; i < 4; i++) g = exploreTile(g, c);
+      for (let i = 0; i < 4; i++) g = exploreTile(g, c, config);
       return g;
     };
 
@@ -291,6 +292,44 @@ describe('engine', () => {
     });
   });
 
+  it('spawns half the usual amount on a newly explored tile, and takes it back on redraw', () => {
+    const cfg: GameConfig = { difficulty: 'Normal', heroCount: 4 }; // budget 40, initial spawn budget 20
+    const big: GameCatalog = { ...cat, units: [unit('rat', { count: 30, spawn: { priority: 5, groupedWith: [], minSpawn: 1 } })] };
+    for (let seed = 0; seed < 20; seed++) {
+      let g = createGame(cfg, big, seed);
+      g = exploreTile(g, big, cfg);
+      const e = g.log[g.log.length - 1][0];
+      expect(e.kind).toBe('tile');
+      if (e.kind !== 'tile') continue;
+      expect(e.spawns).toEqual([{ tileId: e.tileId, unitId: 'rat', count: 2 }]); // rat ≈ 7 pts: floor(20 / 7) = 2
+      expect(g.inPlay.rat).toBe(2);
+      // a normal spawn card on the same budget would place floor(40 / 7) = 5
+      g = redrawTile(g, big, cfg);
+      const e2 = g.log[g.log.length - 1][0];
+      expect(g.inPlay.rat).toBe(e2.kind === 'tile' ? (e2.spawns ?? []).reduce((n, x) => n + x.count, 0) : -1);
+    }
+  });
+
+  it('does not spawn on explore when no miniatures are free', () => {
+    let g = createGame(config, cat, 4);
+    g = { ...g, inPlay: { rat: 6, boss: 1 } };
+    g = exploreTile(g, cat, config);
+    const e = g.log[g.log.length - 1][0];
+    expect(e.kind === 'tile' && e.spawns).toEqual([]);
+    expect(g.inPlay).toEqual({ rat: 6, boss: 1 });
+  });
+
+  it('uses custom difficulty settings', () => {
+    const custom: GameConfig = { difficulty: 'My preset', heroCount: 2, settings: { budget: 2, enemyCardsPerHero: 0.5, spawnCards: 3, exploreSpawn: 0 } };
+    const g = createGame(custom, cat, 1);
+    expect(g.activationDeck.filter((c) => c.kind === 'spawn')).toHaveLength(3);
+    expect(g.activationDeck.filter((c) => c.kind === 'enemy')).toHaveLength(1);
+    const e = exploreTile(g, cat, custom).log.at(-1)![0];
+    expect(e.kind === 'tile' && e.spawns).toEqual([]); // explore spawn switched off (0)
+    // old saves without settings: looked up by name
+    expect(createGame({ difficulty: 'Hard', heroCount: 2 }, cat, 1).activationDeck.filter((c) => c.kind === 'spawn')).toHaveLength(2);
+  });
+
   it('starts a new round when the activation deck runs out', () => {
     let g = createGame(config, cat, 3);
     for (let i = 0; i < 6; i++) g = drawActivation(g, config, cat);
@@ -299,11 +338,13 @@ describe('engine', () => {
 
   it('reveals objectives when exploring and tracks killed enemies', () => {
     let g = createGame(config, cat, 5);
-    while (g.tileDeck.length) g = exploreTile(g, cat);
+    while (g.tileDeck.length) g = exploreTile(g, cat, config);
     const reveal = g.log.flat().find((e) => e.kind === 'tile' && e.tileId === 't2');
     expect(reveal).toMatchObject({ placements: [{ objectiveId: 'o1' }] });
+    const before = g.inPlay.rat ?? 0; // exploring spawns enemies on the new tiles
     g = changeEnemies(g, cat, 'rat', 3);
-    g = changeEnemies(g, cat, 'rat', -5);
+    expect(g.inPlay.rat).toBe(Math.min(6, before + 3));
+    g = changeEnemies(g, cat, 'rat', -99);
     expect(g.inPlay.rat).toBe(0);
   });
 });

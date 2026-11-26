@@ -4,7 +4,7 @@ import { startTileIdOf } from '../domain/mapSets';
 import { markerName } from '../domain/markers';
 import { objectiveMarkerType } from '../domain/objectives';
 import { unitPoints } from '../domain/points';
-import type { Ability, Difficulty, EnemyList, MapSet, MapTile, Mission, Objective, Unit } from '../domain/types';
+import { BUILTIN_DIFFICULTIES, type Difficulty, type DifficultySettings, type Ability, type EnemyList, type MapSet, type MapTile, type Mission, type Objective, type Unit } from '../domain/types';
 import { Rng } from './rng';
 
 /** Everything the game needs, copied in at game start so later edits don't break saves. */
@@ -21,8 +21,16 @@ export interface GameCatalog {
 }
 
 export interface GameConfig {
-  difficulty: Difficulty;
+  /** Name of the difficulty shown in the game: a built-in level, a preset name or "Custom". */
+  difficulty: string;
   heroCount: number;
+  /** The difficulty's values. Missing in games saved before custom difficulties: looked up by name. */
+  settings?: DifficultySettings;
+}
+
+/** The difficulty values of a game. */
+export function difficultyOf(config: GameConfig): DifficultySettings {
+  return config.settings ?? BUILTIN_DIFFICULTIES[config.difficulty as Difficulty] ?? BUILTIN_DIFFICULTIES.Normal;
 }
 
 export type ActivationCard = { kind: 'hero' } | { kind: 'enemy' } | { kind: 'spawn' } | { kind: 'boss'; bossId: string };
@@ -50,7 +58,8 @@ export type GameEvent =
   /** `replacedActivation`: an enemy activation card drawn while no enemies were on the board. */
   | { kind: 'spawn'; tileIds: string[]; spawns: SpawnResult[]; replacedActivation?: boolean }
   /** `replaced`: the tile drawn before this one, which couldn't be placed and went back into the deck. */
-  | { kind: 'tile'; tileId: string; placements: Placement[]; locked?: Placement[]; replaced?: string }
+  /** `spawns`: the initial spawn on the new tile (half size; those enemies move once right away). */
+  | { kind: 'tile'; tileId: string; placements: Placement[]; locked?: Placement[]; replaced?: string; spawns?: SpawnResult[] }
   | { kind: 'tileDeckEmpty' }
   | { kind: 'enemiesChanged'; unitId: string; delta: number }
   /** `revealed`: objectives unlocked by completing this one whose tile is already explored. */
@@ -83,13 +92,7 @@ export interface GameSnapshot {
 // ---- Tuning ---------------------------------------------------------------
 
 const SPAWN_BUDGET_PER_HERO = 10;
-// enemyCardsPerHero: placeholder values, to be balanced through playtesting.
-const DIFFICULTY = {
-  Easy: { budget: 0.75, enemyCardsPerHero: 0.75, spawnCards: 1 },
-  Normal: { budget: 1, enemyCardsPerHero: 1, spawnCards: 1 },
-  Hard: { budget: 1.3, enemyCardsPerHero: 1.25, spawnCards: 2 },
-  Nightmare: { budget: 1.6, enemyCardsPerHero: 1.5, spawnCards: 2 },
-} as const;
+// Difficulty values (budget, enemy cards per hero, spawn cards, explore spawn): BUILTIN_DIFFICULTIES in domain/types.
 
 /** The bigger the board, the more happens. */
 export const activationTileCount = (tiles: number) => Math.min(tiles, Math.max(1, Math.ceil(tiles / 3)));
@@ -102,8 +105,7 @@ export const spawnTileCount = (tiles: number) => Math.min(tiles, Math.max(1, Mat
  * Capped at the number of hero + spawn cards, because enemy cards may never be
  * drawn back to back and each one needs another card in between.
  */
-export function enemyCardCount(heroCount: number, difficulty: Difficulty): number {
-  const d = DIFFICULTY[difficulty];
+export function enemyCardCount(heroCount: number, d: DifficultySettings): number {
   const wanted = Math.max(1, Math.round(heroCount * d.enemyCardsPerHero));
   return Math.min(wanted, heroCount + d.spawnCards);
 }
@@ -126,7 +128,7 @@ export function buildActivationDeck(
   previousCard?: ActivationCard['kind'],
   bossCards: ActivationCard[] = [],
 ): ActivationCard[] {
-  const d = DIFFICULTY[config.difficulty];
+  const d = difficultyOf(config);
   const others: ActivationCard[] = [];
   for (let i = 0; i < config.heroCount; i++) others.push({ kind: 'hero' });
   for (let i = 0; i < d.spawnCards; i++) others.push({ kind: 'spawn' });
@@ -136,7 +138,7 @@ export function buildActivationDeck(
   const allowedGaps = Array.from({ length: shuffled.length + 1 }, (_, i) => i).filter(
     (g) => !(g === 0 && isActivationCard(previousCard) && shuffled.length > 0),
   );
-  const enemies: ActivationCard[] = Array.from({ length: enemyCardCount(config.heroCount, config.difficulty) }, () => ({ kind: 'enemy' }));
+  const enemies: ActivationCard[] = Array.from({ length: enemyCardCount(config.heroCount, d) }, () => ({ kind: 'enemy' }));
   const acts = rng.shuffle([...bossCards, ...enemies].slice(0, allowedGaps.length));
   const gaps = rng.sample(allowedGaps, acts.length);
   const inGap = new Map(gaps.map((g, i) => [g, acts[i]]));
@@ -363,11 +365,13 @@ export function spawnOnTile(
   config: GameConfig,
   cat: GameCatalog,
   rng: Rng,
+  /** Share of the normal spawn budget, e.g. 0.5 for the initial spawn on a newly explored tile. */
+  budgetFactor = 1,
 ): SpawnResult[] {
   const points = new Map(cat.units.map((u) => [u.id, unitPoints(u, cat.abilities)]));
   const available = (u: Unit) => u.count - (inPlay[u.id] ?? 0);
   const canSpawn = (u: Unit) => available(u) >= Math.max(1, u.spawn.minSpawn);
-  const budget = SPAWN_BUDGET_PER_HERO * Math.max(1, config.heroCount) * DIFFICULTY[config.difficulty].budget;
+  const budget = SPAWN_BUDGET_PER_HERO * Math.max(1, config.heroCount) * difficultyOf(config).budget * budgetFactor;
 
   const results: SpawnResult[] = [];
   const spawn = (u: Unit, budgetLeft: number) => {
@@ -391,15 +395,20 @@ export function spawnOnTile(
   return results;
 }
 
-export function exploreTile(s: GameSnapshot, cat: GameCatalog): GameSnapshot {
+
+export function exploreTile(s: GameSnapshot, cat: GameCatalog, config: GameConfig): GameSnapshot {
   if (s.tileDeck.length === 0) return { ...s, log: [...s.log, [{ kind: 'tileDeckEmpty' }]] };
   const [tileId, ...rest] = s.tileDeck;
-  const next = { ...s, tileDeck: rest, tilesInPlay: [...s.tilesInPlay, tileId] };
+  const rng = new Rng(s.rng);
+  // Initial spawn on the new tile: half the usual size (the enemies move once right away).
+  const inPlay = { ...s.inPlay };
+  const factor = difficultyOf(config).exploreSpawn; // 0 switches the spawn on explore off
+  const spawns = factor > 0 && canAnythingSpawn(inPlay, cat) ? spawnOnTile(tileId, inPlay, config, cat, rng, factor) : [];
+  const next = { ...s, tileDeck: rest, tilesInPlay: [...s.tilesInPlay, tileId], inPlay };
   const locked = s.placements.filter((p) => p.tileId === tileId && !isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat));
   const placements = newlyFound(s, next, cat);
-  const rng = new Rng(s.rng);
   const summoned = summonBosses(next, cat, placements.map((p) => p.objectiveId), 'found', rng);
-  return { ...summoned.s, rng: rng.state, log: [...s.log, [{ kind: 'tile', tileId, placements, locked }, ...summoned.events]] };
+  return { ...summoned.s, rng: rng.state, log: [...s.log, [{ kind: 'tile', tileId, placements, locked, spawns }, ...summoned.events]] };
 }
 
 /** The tile drawn by the latest action, if that action was exploring. */
@@ -418,17 +427,21 @@ export function canRedrawTile(s: GameSnapshot): boolean {
  * map): put it back into the tile deck at a random position (never on top)
  * and draw another one.
  */
-export function redrawTile(s: GameSnapshot, cat: GameCatalog): GameSnapshot {
+export function redrawTile(s: GameSnapshot, cat: GameCatalog, config: GameConfig): GameSnapshot {
   const old = lastExploredTile(s);
   if (!old || s.tileDeck.length === 0) return s;
+  // Take back the enemies that spawned on the tile that goes back into the deck.
+  const oldEvent = s.log[s.log.length - 1].find((x) => x.kind === 'tile');
+  const inPlay = { ...s.inPlay };
+  if (oldEvent?.kind === 'tile') for (const sp of oldEvent.spawns ?? []) inPlay[sp.unitId] = Math.max(0, (inPlay[sp.unitId] ?? 0) - sp.count);
   const rng = new Rng(s.rng);
   const tileDeck = [...s.tileDeck];
   // Below the replacement that is drawn next, so it never ends up on top again
   // (unless it is the only other tile left).
   const minPos = Math.min(2, tileDeck.length);
   tileDeck.splice(minPos + rng.int(tileDeck.length - minPos + 1), 0, old);
-  const back: GameSnapshot = { ...s, rng: rng.state, tileDeck, tilesInPlay: s.tilesInPlay.filter((id) => id !== old) };
-  const next = exploreTile(back, cat);
+  const back: GameSnapshot = { ...s, rng: rng.state, tileDeck, inPlay, tilesInPlay: s.tilesInPlay.filter((id) => id !== old) };
+  const next = exploreTile(back, cat, config);
   const entry = next.log[next.log.length - 1].map((e) => (e.kind === 'tile' ? { ...e, replaced: old } : e));
   return { ...next, log: [...next.log.slice(0, -1), entry] };
 }

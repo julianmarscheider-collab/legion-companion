@@ -122,6 +122,11 @@ export const RULES = {
     title: 'Spawned together with',
     text: 'When this unit spawns, these units are added to the same tile if the spawn budget allows it and miniatures are free.',
   },
+  exploreSpawn: {
+    section: 'Spawning',
+    title: 'Spawn on explore',
+    text: 'Whenever a new tile is explored, enemies spawn on it right away: half the usual spawn size (but at least the min spawn number). Move the newly spawned enemies once immediately. No spawn on the starting tile, and none if no miniatures are free.',
+  },
   spawnBudget: {
     section: 'Spawning',
     title: 'Spawn size',
@@ -132,7 +137,7 @@ export const RULES = {
   abilityCollection: {
     section: 'Abilities',
     title: 'Collection',
-    text: 'Groups abilities and boss cards, e.g. all cards of the “Goblin Warlord”. Filter the Abilities list by collection, and add a whole collection to a boss deck in one go.',
+    text: 'Groups abilities, e.g. by faction (“Undead”) or theme (“Poisons”), or the boss cards of one boss (“Goblin Warlord”). Use it to filter the Abilities list. For boss cards, a whole collection can also be added to a boss deck in one go.',
   },
   bossCard: {
     section: 'Bosses',
@@ -142,7 +147,12 @@ export const RULES = {
   abilityCostType: {
     section: 'Abilities',
     title: 'Cost type',
-    text: 'Additive abilities add a fixed number of points. Multiplicative abilities multiply the unit’s points, which suits abilities that get better the stronger the unit is. Unit points = (stats + additive abilities) × multiplicative abilities.',
+    text: 'Additive abilities add a fixed number of points. Multiplicative abilities multiply the unit’s points, which suits abilities that get better the stronger the unit is. Dependent abilities add points calculated from chosen stats of the unit (e.g. Attacks × 2). Unit points = (stats + additive abilities) × multiplicative abilities.',
+  },
+  abilityDependent: {
+    section: 'Abilities',
+    title: 'Dependent cost',
+    text: 'The ability’s points depend on the unit it is given to: the sum of each chosen stat × its multiplier. Example: Poisonous with Attacks × 2 + Strength × 1 costs 5 points on a Goblin (1 attack, Strength 3) and 8 on the Goblin King (2 attacks, Strength 4). Added like an additive cost.',
   },
   abilityPoints: {
     section: 'Abilities',
@@ -277,10 +287,30 @@ export const RULES = {
     title: 'Number of heroes',
     text: 'Each round’s activation deck has one hero card per hero. Any hero with a ready activation token may act on a hero card. Also scales enemy cards and spawn sizes.',
   },
+  diffBudget: {
+    section: 'Playing',
+    title: 'Spawn size',
+    text: 'Multiplies the spawn budget (10 points per hero): 1 = normal, 1.5 = half again as many enemies per spawn.',
+  },
+  diffEnemyCards: {
+    section: 'Playing',
+    title: 'Enemy cards per hero',
+    text: 'Enemy activation cards per round = heroes × this, rounded, at least 1, and at most the number of hero + spawn cards (they are never drawn back to back).',
+  },
+  diffSpawnCards: {
+    section: 'Playing',
+    title: 'Spawn cards per round',
+    text: 'How many spawn cards are shuffled into the activation deck each round.',
+  },
+  diffExploreSpawn: {
+    section: 'Playing',
+    title: 'Spawn on explore',
+    text: 'Size of the spawn on a newly explored tile, as a share of a normal spawn: 0.5 = half, 0 = no spawn on explore.',
+  },
   difficulty: {
     section: 'Playing',
     title: 'Difficulty',
-    text: 'Changes the number of enemy activation cards per round (heroes × 0.75 / 1 / 1.25 / 1.5), spawn cards (1 / 1 / 2 / 2) and spawn size.',
+    text: 'Changes the number of enemy activation cards per round (heroes × 0.75 / 1 / 1.25 / 1.5), spawn cards (1 / 1 / 2 / 2) and spawn size (× 0.75 / 1 / 1.3 / 1.6). Choose “Custom…” to set every value yourself, and save your settings as a preset to use them again later.',
     todo: 'Final balance values, to be decided through playtesting.',
   },
   activationDeck: {

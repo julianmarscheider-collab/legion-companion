@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { HelpTip } from '../../components/HelpTip';
 import { Dropdown } from '../../components/Dropdown';
-import { MinusIcon, PlusIcon, RoundIcon, SkullIcon, TileIcon } from '../../components/Icons';
+import { CrownIcon, MinusIcon, PlusIcon, RoundIcon, SkullIcon, TileIcon } from '../../components/Icons';
 import { TileThumb, UnitThumb } from '../../components/Thumbs';
 import { UnitCard } from '../../components/UnitCard';
 import { repos } from '../../data/repositories';
@@ -145,7 +145,7 @@ export function GamePage() {
                   action={
                     e.kind === 'tile' && canRedrawTile(s) ? (
                       <span className="redraw">
-                        <button className="small" onClick={() => draw(() => redrawTile(s, cat))}>
+                        <button className="small" onClick={() => draw(() => redrawTile(s, cat, config))}>
                           ↻ Redraw tile
                         </button>
                         <span className="muted small">if it can’t be placed</span>
@@ -174,7 +174,7 @@ export function GamePage() {
               count={s.tileDeck.length}
               note={s.tileDeck.length ? `${plural(s.tileDeck.length, 'tile')} left` : 'No tiles left'}
               disabled={s.tileDeck.length === 0}
-              onDraw={() => draw(() => exploreTile(s, cat))}
+              onDraw={() => draw(() => exploreTile(s, cat, config))}
             />
             {/* One boss deck per boss on the board; drawn automatically when the boss activates. */}
             {Object.entries(s.bosses ?? {}).map(([bossId, b]) => (
@@ -208,7 +208,7 @@ export function GamePage() {
                               <UnitThumb unit={u} />
                               <button className="ghost grow left" onClick={() => setOpenUnit(openUnit === u.id ? null : u.id)}>
                                 <span className="enemy-name">
-                                  <span className="crown" aria-hidden="true">♛</span>
+                                  <CrownIcon />
                                   <strong>{u.name}</strong>
                                   <span className="badge boss-badge">Boss</span>
                                 </span>

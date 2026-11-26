@@ -46,3 +46,23 @@ export function SkullIcon() {
     </svg>
   );
 }
+
+/** Question mark for help buttons, drawn so it is centred in any font or heading. */
+export function QuestionIcon() {
+  return (
+    <svg className="icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M5.6 6.1a2.4 2.4 0 1 1 3.5 2.1c-.7.4-1.1.9-1.1 1.6v.5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <circle cx="8" cy="12.9" r="1.05" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Solid crown with a band (bosses). */
+export function CrownIcon() {
+  return (
+    <svg className="icon crown" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M2 4.5l3.5 3L8 2.5l2.5 5 3.5-3-1.2 7.5H3.2z" fill="currentColor" />
+      <rect x="3.2" y="12.6" width="9.6" height="1.6" rx="0.5" fill="currentColor" />
+    </svg>
+  );
+}

@@ -63,6 +63,14 @@ describe('points', () => {
     expect(unitPoints({ ...base, attacks: 1, wounds: 1 }, [])).toBe(one); // 1 = same as before
   });
 
+  it('computes dependent ability costs from the unit’s stats', () => {
+    const meta = { ownerId: 'o', createdAt: 0, updatedAt: 0, description: '' };
+    const poison = { ...meta, id: 'p', name: 'Poisonous', points: 0, costType: 'dependent' as const, dependsOn: [{ stat: 'attacks' as const, factor: 2 }, { stat: 'strength' as const, factor: 1 }] };
+    expect(unitPoints({ ...base, abilityIds: ['p'] }, [poison]) - unitPoints(base, [])).toBe(5); // 2×1 + 3
+    const king = { ...base, strength: 4, attacks: 2 };
+    expect(unitPoints({ ...king, abilityIds: ['p'] }, [poison]) - unitPoints(king, [])).toBe(8); // 2×2 + 4
+  });
+
   it('adds ability points', () => {
     const abilities = [{ id: 'a', ownerId: 'o', createdAt: 0, updatedAt: 0, name: 'Poison', description: '', points: 3 }];
     const p = unitPoints({ ...base, abilityIds: ['a'] }, abilities);

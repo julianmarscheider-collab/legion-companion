@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { HelpTip } from '../../components/HelpTip';
 import { UnitCard } from '../../components/UnitCard';
 import { findUnit, type GameCatalog, type GameEvent, type Placement } from '../../game/engine';
 
@@ -123,6 +124,14 @@ export function describe(e: GameEvent, cat: GameCatalog): Described {
         tileRows: [{ tileId: e.tileId, text: `Place ${tile(e.tileId)} where the heroes left the board.` }],
         lines: [
           ...tileRules(e.tileId),
+          ...(e.spawns?.length
+            ? [
+                <span key="spawn" className="initial-spawn">
+                  <strong>Spawn:</strong> {e.spawns.map((s) => `${s.count} × ${unit(s.unitId)}`).join(' and ')} on this tile.
+                  <em> Move the spawned enemies once right away.</em> <HelpTip rule="exploreSpawn" />
+                </span>,
+              ]
+            : []),
           ...e.placements.flatMap((p) => placement(p, e.tileId)),
           ...(e.locked ?? []).flatMap((p) => lockedPlacement(p, e.tileId)),
         ],

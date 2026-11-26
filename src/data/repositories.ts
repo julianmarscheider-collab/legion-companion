@@ -1,5 +1,5 @@
 import type { Table } from 'dexie';
-import type { Ability, EnemyList, Entity, MapSet, MapTile, Mission, Objective, Unit } from '../domain/types';
+import type { Ability, DifficultyPreset, EnemyList, Entity, MapSet, MapTile, Mission, Objective, Unit } from '../domain/types';
 import { db } from './db';
 import type { SavedGame } from './savedGame';
 
@@ -53,6 +53,7 @@ export const repos = {
   mapTiles: new DexieRepository<MapTile>(db.mapTiles),
   mapSets: new DexieRepository<MapSet>(db.mapSets),
   games: new DexieRepository<SavedGame>(db.games),
+  difficultyPresets: new DexieRepository<DifficultyPreset>(db.difficultyPresets),
 };
 
 export function newId(): string {

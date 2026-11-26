@@ -1,4 +1,4 @@
-import type { Ability, Unit } from './types';
+import { STAT_LABELS, type Ability, type StatKey, type Unit } from './types';
 
 // Automatic point values. Tune the constants here to rebalance every unit at once.
 //
@@ -54,11 +54,23 @@ function unitAbilities(u: Unit, abilities: Ability[]): Ability[] {
 
 export const isMultiplier = (a: Ability) => a.costType === 'multiply';
 
-/** Sum of the unit's additive ability costs. */
+/** The unit's value of a stat (Attacks and Wounds count as at least 1). */
+export function statValue(u: Unit, stat: StatKey): number {
+  if (stat === 'attacks') return attacksOf(u);
+  if (stat === 'wounds') return woundsOf(u);
+  return u[stat];
+}
+
+/** Points of an additive or dependent ability for this unit (multiplicative abilities: 0). */
+export function abilityCostFor(a: Ability, u: Unit): number {
+  if (a.costType === 'multiply') return 0;
+  if (a.costType === 'dependent') return (a.dependsOn ?? []).reduce((sum, d) => sum + d.factor * statValue(u, d.stat), 0);
+  return a.points;
+}
+
+/** Sum of the unit's additive and dependent ability costs. */
 export function abilityPoints(u: Unit, abilities: Ability[]): number {
-  return unitAbilities(u, abilities)
-    .filter((a) => !isMultiplier(a))
-    .reduce((sum, a) => sum + a.points, 0);
+  return unitAbilities(u, abilities).reduce((sum, a) => sum + abilityCostFor(a, u), 0);
 }
 
 /** Product of the unit's multiplicative ability costs (1 if none). */
@@ -75,5 +87,20 @@ export function unitPoints(u: Unit, abilities: Ability[]): number {
 
 /** Short cost label, e.g. "+4 pts" or "×1.25". */
 export function abilityCostLabel(a: Ability): string {
-  return isMultiplier(a) ? `×${a.multiplier ?? 1}` : `${a.points >= 0 ? '+' : ''}${a.points} pts`;
+  if (isMultiplier(a)) return `×${a.multiplier ?? 1}`;
+  if (a.costType === 'dependent') return dependentFormula(a);
+  return `${a.points >= 0 ? '+' : ''}${a.points} pts`;
+}
+
+/** e.g. "2×Attacks + 1×Strength" */
+export function dependentFormula(a: Ability): string {
+  const terms = (a.dependsOn ?? []).map((d) => `${d.factor}×${STAT_LABELS[d.stat]}`);
+  return terms.length ? terms.join(' + ') : '0 pts';
+}
+
+/** Cost label for a specific unit, e.g. "+5 pts (2×Attacks + 1×Strength)". */
+export function abilityCostLabelFor(a: Ability, u: Unit): string {
+  if (a.costType !== 'dependent') return abilityCostLabel(a);
+  const p = Math.round(abilityCostFor(a, u) * 10) / 10;
+  return `${p >= 0 ? '+' : ''}${p} pts: ${dependentFormula(a)}`;
 }

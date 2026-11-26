@@ -6,7 +6,7 @@ import { PhotoField } from '../../components/PhotoField';
 import { MiniCount, PointsBreakdown, StatLine } from '../../components/UnitCard';
 import { newEntity, repos } from '../../data/repositories';
 import { useCollection } from '../../data/useCollection';
-import { abilityCostLabel, unitPoints } from '../../domain/points';
+import { abilityCostLabelFor, unitPoints } from '../../domain/points';
 import { DEFENSE_TYPES, type Unit } from '../../domain/types';
 
 /** All faction names used by these units, sorted. */
@@ -53,7 +53,7 @@ function UnitEditor({ value: u, onChange }: EditorProps<Unit>) {
         items={abilities.filter((a) => !a.bossCard)}
         selected={u.abilityIds}
         onChange={(abilityIds) => set({ abilityIds })}
-        extra={(a) => `(${abilityCostLabel(a)})`}
+        extra={(a) => `(${abilityCostLabelFor(a, u)})`}
         noItemsText="Create abilities in the Ability generator first."
       />
 
