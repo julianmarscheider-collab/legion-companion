@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
 import type { RuleKey } from '../domain/rules';
 import { HelpTip, LabelText } from './HelpTip';
@@ -33,23 +33,34 @@ export function TextArea(p: { label: string; help?: RuleKey; value: string; onCh
 
 export function NumberField(p: { label: string; help?: RuleKey; value: number; onChange(v: number): void; min?: number; max?: number; step?: number; hint?: string }) {
   const id = useId();
+  // What the player is typing. Unfinished input ("", "-", "1.") is kept as it is
+  // and only complete numbers are passed on; leaving the field shows the saved value again.
+  const [draft, setDraft] = useState<string | null>(null);
+  const decimals = p.step !== undefined && !Number.isInteger(p.step);
+  const clamp = (v: number) => Math.min(p.max ?? Infinity, Math.max(p.min ?? -Infinity, v));
   return (
     <div className="field">
       <LabelText label={p.label} help={p.help} htmlFor={id} />
       <input
         id={id}
-        type="number"
-        inputMode="numeric"
-        value={Number.isFinite(p.value) ? p.value : ''}
-        min={p.min}
-        max={p.max}
-        step={p.step}
+        type="text"
+        inputMode={decimals || (p.min ?? 0) < 0 ? 'decimal' : 'numeric'}
+        value={draft ?? (Number.isFinite(p.value) ? String(p.value) : '')}
         onChange={(e) => {
-          let v = e.target.valueAsNumber;
-          if (Number.isNaN(v)) v = p.min ?? 0;
-          if (p.min !== undefined) v = Math.max(p.min, v);
-          if (p.max !== undefined) v = Math.min(p.max, v);
-          p.onChange(v);
+          const text = e.target.value;
+          setDraft(text);
+          const normalized = text.trim().replace(',', '.');
+          if (/^-?\d+(\.\d+)?$/.test(normalized)) p.onChange(clamp(Number(normalized)));
+        }}
+        onBlur={() => setDraft(null)}
+        onKeyDown={(e) => {
+          // Arrow keys step the value like a number field.
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+          e.preventDefault();
+          const step = p.step ?? 1;
+          const next = clamp(Math.round(((Number.isFinite(p.value) ? p.value : 0) + (e.key === 'ArrowUp' ? step : -step)) * 1000) / 1000);
+          setDraft(null);
+          p.onChange(next);
         }}
       />
       {p.hint && <small>{p.hint}</small>}
