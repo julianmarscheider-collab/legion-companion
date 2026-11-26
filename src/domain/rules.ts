@@ -21,7 +21,7 @@ export const RULES = {
   points: {
     section: 'Unit stats',
     title: 'Points',
-    text: 'Calculated automatically to balance difficulty. Stats = 4 × expected damage per activation (all attacks) × expected hero attacks needed to kill the unit (all wounds) + 2 × Speed. Unit points = (stats + additive abilities) × multiplicative abilities.',
+    text: 'Calculated automatically to balance difficulty. Stats = 10 × (expected damage dealt + expected damage to take out) × (1 + (Speed − 2) / 4). Damage dealt = attack value × damage value × (Strength − 1)/6, where each attack above the first adds 1.5 and each damage point above the first adds 0.75 (heroes spend a defence die on every attack, so attacks weigh more). Damage to take out = Toughness × Wounds × (Defense − 1)/6, × 0.75 with a defense type. Unit points = (stats + additive abilities) × multiplicative abilities.',
   },
   strength: {
     section: 'Unit stats',
@@ -47,13 +47,13 @@ export const RULES = {
   defenseType: {
     section: 'Unit stats',
     title: 'Defense type',
-    text: 'None, Evasive or Armored. Heroes can get bonuses on their attack rolls against a defense type, e.g. +1 Strength vs Armored enemies.',
+    text: 'None, Evasive or Armored. A defense type is a disadvantage for the unit: heroes can get bonuses on their attack rolls against it, e.g. +1 Strength vs Armored enemies. It lowers the defence part of the unit’s points by 25 %.',
     todo: 'Which hero bonuses exist against Evasive and Armored enemies.',
   },
   speed: {
     section: 'Unit stats',
     title: 'Speed',
-    text: 'Number of movement dice rolled when the unit activates.',
+    text: 'Number of movement dice rolled when the unit activates (at least 1: there are no stationary units). Speed 2 is the norm; each point above or below changes the unit’s points by 25 %.',
     todo: 'How enemies move: which hero they move towards, line of sight, moving between tiles.',
   },
   toughness: {
@@ -71,6 +71,34 @@ export const RULES = {
     title: 'Special abilities',
     text: 'Extra rules for this unit. Each ability adds its point cost to the unit. Create and edit abilities in the Ability generator.',
     link: { to: '/abilities', label: 'Open abilities' },
+  },
+
+  // ---- Bosses ----
+  isBoss: {
+    section: 'Bosses',
+    title: 'Boss',
+    text: 'A boss never spawns like other enemies. It only appears when an objective summons it. While it is on the board, its activation cards are in the activation deck, and each time one is drawn the boss acts through a card from its boss deck. Removing it from the board defeats it.',
+  },
+  bossActivations: {
+    section: 'Bosses',
+    title: 'Boss activations per round',
+    text: 'How many boss activation cards go into the activation deck each round while the boss is alive. Like enemy activations, they are never drawn back to back.',
+  },
+  bossDeck: {
+    section: 'Bosses',
+    title: 'Boss deck',
+    text: 'The boss cards this boss draws from, with the number of copies of each. Create boss cards under Abilities (tick “Boss deck card”). When the deck is used up, it is reshuffled.',
+    link: { to: '/abilities', label: 'Open abilities' },
+  },
+  summonBoss: {
+    section: 'Bosses',
+    title: 'Summons a boss',
+    text: 'When this objective is found or completed, the chosen boss appears: either at this objective or on a random tile in play. Each boss appears only once per game.',
+  },
+  defeatBoss: {
+    section: 'Bosses',
+    title: 'Completed when a boss is defeated',
+    text: 'This objective is completed automatically when the chosen boss is defeated (removed from the board). Typical for objectives like “Slay the Warlord”, placed “not on the map”.',
   },
 
   // ---- Units: miniatures & spawning ----
@@ -101,6 +129,16 @@ export const RULES = {
   },
 
   // ---- Abilities ----
+  abilityCollection: {
+    section: 'Abilities',
+    title: 'Collection',
+    text: 'Groups abilities and boss cards, e.g. all cards of the “Goblin Warlord”. Filter the Abilities list by collection, and add a whole collection to a boss deck in one go.',
+  },
+  bossCard: {
+    section: 'Bosses',
+    title: 'Boss deck card',
+    text: 'A card for a boss deck instead of a unit ability. Whenever a boss activates, the top card of its boss deck is drawn and the boss does what it says. Boss cards have no point cost.',
+  },
   abilityCostType: {
     section: 'Abilities',
     title: 'Cost type',
@@ -134,12 +172,12 @@ export const RULES = {
   objectivePlacement: {
     section: 'Objectives & missions',
     title: 'Placed on',
-    text: 'Where the app hides the objective at the start of the game. “A marker of a certain type”: on a random marker of that type (e.g. any Altar). “The objective location of a random tile”: on the objective location printed on every tile, on a random tile (never the starting tile, and preferably one without another objective). The objective is revealed when that tile is explored.',
+    text: 'Where the app hides the objective at the start of the game. “A marker”: on a random marker with that name (e.g. any Altar). “The objective location of a random tile”: on the objective location printed on every tile, on a random tile (never the starting tile, and preferably one without another objective). “Not on the map”: no place on a tile, e.g. “Slay the Warlord”; it is known as soon as it is unlocked. The objective is revealed when that tile is explored.',
   },
   markerType: {
     section: 'Objectives & missions',
-    title: 'Marker type',
-    text: 'The objective is hidden on a random tile marker of this type (e.g. Altar) and revealed when that tile is explored. If no tile in the map set has such a marker, it goes on the objective location of a random tile instead.',
+    title: 'Marker',
+    text: 'The objective is hidden on a random marker with this name (e.g. Altar) and revealed when that tile is explored. If no tile in the map set has such a marker, it goes on the objective location of a random tile instead.',
     link: { to: '/tiles', label: 'Open map tiles' },
   },
   questline: {
@@ -204,7 +242,7 @@ export const RULES = {
   tileMarkers: {
     section: 'Map',
     title: 'Location markers',
-    text: 'Markers printed on the tile, each with a label (A, B…) and a type (Altar, Chest, Door…). Objectives are placed on markers by type.',
+    text: 'Locations printed on the tile, each with a name (Altar, Chest, Door…). Objectives are placed on markers by name. A tile can have several markers with the same name; the players then pick one.',
   },
   tileRules: {
     section: 'Map',
@@ -216,6 +254,11 @@ export const RULES = {
     title: 'Tiles in this set',
     text: 'The tile deck for a game. Every tile except the starting tile is shuffled; a new one is drawn whenever the heroes move off the explored board.',
     link: { to: '/tiles', label: 'Open map tiles' },
+  },
+  redrawTile: {
+    section: 'Map',
+    title: 'Redraw tile',
+    text: 'If a drawn tile can’t be placed legally (for example it would close off the map), redraw it: the tile goes back into the tile deck at a random position (never on top) and a new tile is drawn. Objectives on the returned tile count as not found until it is drawn again.',
   },
   startTile: {
     section: 'Map',

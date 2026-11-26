@@ -20,24 +20,26 @@ export function CrudPage<T extends Named>(p: {
   summary(item: T): ReactNode;
   Editor(props: EditorProps<T>): ReactNode;
   newLabel?: string;
-  /** Optional filter buttons, e.g. by faction. Items with an empty group fall under `emptyLabel`. */
-  groups?: { label: string; get(item: T): string; emptyLabel: string };
+  /** Optional filter buttons, e.g. by faction; several rows allowed. Items with an empty group fall under `emptyLabel`. */
+  groups?: GroupDef<T> | GroupDef<T>[];
 }) {
   const { user } = useAuth();
   const items = useCollection(p.repo);
   const [draft, setDraft] = useState<T | null>(null);
   const [dirty, setDirty] = useState(false);
   const [query, setQuery] = useState('');
-  const [group, setGroup] = useState<string | null>(null);
+  const groupDefs = p.groups ? (Array.isArray(p.groups) ? p.groups : [p.groups]) : [];
+  const [groupSel, setGroupSel] = useState<(string | null)[]>([]);
 
   const filtered = useMemo(
     () =>
       items.filter(
         (i) =>
           i.name.toLowerCase().includes(query.toLowerCase()) &&
-          (group === null || (p.groups?.get(i).trim() ?? '') === group),
+          groupDefs.every((g, k) => groupSel[k] == null || g.get(i).trim() === groupSel[k]),
       ),
-    [items, query, group, p.groups],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, query, groupSel],
   );
   const isNew = draft && !items.some((i) => i.id === draft.id);
 
@@ -69,7 +71,16 @@ export function CrudPage<T extends Named>(p: {
           </button>
         </header>
         <p className="muted">{p.intro}</p>
-        {p.groups && <GroupChips items={items} groups={p.groups} value={group} onChange={setGroup} />}
+        {groupDefs.map((g, k) => (
+          <GroupChips
+            key={g.label}
+            // Each row counts only the items that pass the other rows' filters.
+            items={items.filter((i) => groupDefs.every((o, j) => j === k || groupSel[j] == null || o.get(i).trim() === groupSel[j]))}
+            groups={g}
+            value={groupSel[k] ?? null}
+            onChange={(v) => setGroupSel((sel) => Object.assign([...sel], { [k]: v }))}
+          />
+        ))}
         {items.length > 5 && <input className="search" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />}
         <ul className="list">
           {filtered.map((item) => (
@@ -111,6 +122,12 @@ export function CrudPage<T extends Named>(p: {
       )}
     </div>
   );
+}
+
+interface GroupDef<T> {
+  label: string;
+  get(item: T): string;
+  emptyLabel: string;
 }
 
 function GroupChips<T>(p: {

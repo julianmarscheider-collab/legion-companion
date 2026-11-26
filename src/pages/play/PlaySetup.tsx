@@ -70,6 +70,12 @@ export function PlaySetup() {
       abilities,
       mapSet,
       tiles: tiles.filter((t) => mapSet.tileIds.includes(t.id)),
+      // Bosses the mission's objectives can summon or are linked to.
+      bosses: units.filter(
+        (u) =>
+          u.isBoss &&
+          objectives.some((o) => mission.objectiveIds.includes(o.id) && (o.summonBossId === u.id || o.defeatBossId === u.id)),
+      ),
     };
     const config = { difficulty, heroCount };
     const game: SavedGame = {

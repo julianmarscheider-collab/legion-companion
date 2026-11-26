@@ -20,7 +20,13 @@ export function buildSampleData(ownerId: string): SampleData {
   const poison = ability('Poisonous', 'A hero damaged by this unit takes 1 extra damage at the start of their next turn.', 3);
   const regen = ability('Regeneration', 'Heals 1 damage at the start of each of its activations.', 6);
   const leader = ability('Leader', 'Other enemies on the same tile get +1 Strength.', 5);
-  const abilities = [ranged, poison, regen, leader];
+  // Boss deck cards for the Goblin Warlord (abilities ticked as boss cards).
+  const bossCard = (name: string, description: string): Ability => ({ ...e(), name, description, points: 0, bossCard: true, collection: 'Goblin Warlord' });
+  const crush = bossCard('Crushing Blow', 'The Warlord moves towards the nearest hero and attacks them twice.');
+  const warCry = bossCard('War Cry', 'Activate all other enemies on the Warlord’s tile. They get +1 Strength this activation.');
+  const horde = bossCard('Call the Horde', 'Spawn 3 Goblins on the Warlord’s tile (if miniatures are free).');
+  const charge = bossCard('Brutal Charge', 'The Warlord moves 2 extra movement dice towards the farthest hero and attacks them.');
+  const abilities = [ranged, poison, regen, leader, crush, warCry, horde, charge];
 
   const unit = (name: string, over: Partial<Unit>): Unit => ({
     ...e(), name, faction: 'Goblins', description: '', photos: [], strength: 3, damage: 1, defense: 3, defenseType: 'None', speed: 2,
@@ -38,18 +44,25 @@ export function buildSampleData(ownerId: string): SampleData {
     abilityIds: [leader.id, poison.id],
     spawn: { priority: 2, groupedWith: [goblin.id], minSpawn: 1 },
   });
-  const units = [goblin, archer, troll, king];
+  const warlord = unit('Goblin Warlord', {
+    strength: 5, damage: 2, attacks: 2, defense: 5, defenseType: 'Armored', speed: 2, toughness: 4, wounds: 3, count: 1,
+    abilityIds: [leader.id],
+    isBoss: true, bossActivations: 1,
+    bossDeck: [{ abilityId: crush.id, copies: 2 }, { abilityId: warCry.id, copies: 1 }, { abilityId: horde.id, copies: 1 }, { abilityId: charge.id, copies: 1 }],
+    spawn: { priority: 1, groupedWith: [], minSpawn: 1 },
+  });
+  const units = [goblin, archer, troll, king, warlord];
 
   const tile = (code: string, name: string, markers: MapTile['markers'], rules = ''): MapTile => ({ ...e(), code, name, collection: 'Goblin Caves', description: '', photos: [], markers, rules });
   const tiles = [
-    { ...tile('1', 'Entrance Hall', [{ label: 'A', type: 'Door' }]), isStart: true },
-    tile('2', 'Guard Room', [{ label: 'A', type: 'Chest' }]),
+    { ...tile('1', 'Entrance Hall', [{ label: 'Door' }]), isStart: true },
+    tile('2', 'Guard Room', [{ label: 'Chest' }]),
     tile('3', 'Corridor', []),
-    tile('4', 'Shrine', [{ label: 'A', type: 'Altar' }, { label: 'B', type: 'Chest' }]),
-    tile('5', 'Prison Cells', [{ label: 'A', type: 'Cell' }, { label: 'B', type: 'Cell' }]),
+    tile('4', 'Shrine', [{ label: 'Altar' }, { label: 'Chest' }]),
+    tile('5', 'Prison Cells', [{ label: 'Cell' }, { label: 'Cell' }]),
     tile('6', 'Collapsed Tunnel', [], 'Rubble: models moving through this tile roll one fewer movement die (minimum 1).'),
-    tile('7', 'Fungus Cavern', [{ label: 'A', type: 'Chest' }], 'Spore clouds: a hero who ends their turn here rolls a d6; on a 1 they take 1 damage.'),
-    tile('8', 'Throne Room', [{ label: 'A', type: 'Altar' }]),
+    tile('7', 'Fungus Cavern', [{ label: 'Chest' }], 'Spore clouds: a hero who ends their turn here rolls a d6; on a 1 they take 1 damage.'),
+    tile('8', 'Throne Room', [{ label: 'Altar' }]),
   ];
 
   const objective = (name: string, markerType: string, flavour: string, setup: string, completion: string) => ({ ...e(), name, description: '', flavour, markerType, setup, completion });
@@ -76,15 +89,30 @@ export function buildSampleData(ownerId: string): SampleData {
     lockedFlavour: 'Behind a rusted iron door someone is calling for help. The lock is old, but it holds firm.',
     lockedText: 'Place a prisoner miniature in the cell. The cell door is locked: it can’t be opened until a key is found.',
   });
-  const objectives = [shrine, prisoner, key];
+  // Desecrating the shrine angers the Warlord, who appears at the altar.
+  Object.assign(shrine, { summonBossId: warlord.id, summonWhen: 'completed', summonAt: 'objective' });
+  const slay = {
+    ...objective(
+      'Slay the Warlord',
+      '',
+      'A roar shakes the cavern. The Goblin Warlord has come to avenge his shrine.',
+      'The Warlord is on the board: defeat him.',
+      'Remove the Goblin Warlord from the board (mark him as defeated).',
+    ),
+    placement: 'none' as const,
+    isStart: false,
+    revealedBy: shrine.id,
+    defeatBossId: warlord.id,
+  };
+  const objectives = [shrine, prisoner, key, slay];
 
   return {
     abilities,
     units,
     tiles,
     objectives: objectives as Objective[],
-    missions: [{ ...e(), name: 'The Goblin Warren', description: 'Search the rubble for the key, free the prisoner and desecrate the goblin shrine.', objectiveIds: [key.id, prisoner.id, shrine.id] }],
-    enemyLists: [{ ...e(), name: 'Goblin Horde', description: '', unitIds: units.map((u) => u.id) }],
+    missions: [{ ...e(), name: 'The Goblin Warren', description: 'Search the rubble for the key, free the prisoner, desecrate the goblin shrine and slay the Warlord who comes to defend it.', objectiveIds: [key.id, prisoner.id, shrine.id, slay.id] }],
+    enemyLists: [{ ...e(), name: 'Goblin Horde', description: '', unitIds: units.filter((u) => !u.isBoss).map((u) => u.id) }],
     mapSets: [{ ...e(), name: 'Goblin Caves', description: '', tileIds: tiles.map((t) => t.id), startTileId: tiles[0].id }],
   };
 }

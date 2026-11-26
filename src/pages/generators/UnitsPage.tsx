@@ -1,5 +1,6 @@
 import { CrudPage, type EditorProps } from '../../components/CrudPage';
-import { PickList, NumberField, SelectField, TextArea, TextField } from '../../components/fields';
+import { Checkbox, PickList, NumberField, SelectField, TextArea, TextField } from '../../components/fields';
+import { BossDeckEditor } from '../../components/BossDeckEditor';
 import { HelpTip } from '../../components/HelpTip';
 import { PhotoField } from '../../components/PhotoField';
 import { MiniCount, PointsBreakdown, StatLine } from '../../components/UnitCard';
@@ -41,7 +42,7 @@ function UnitEditor({ value: u, onChange }: EditorProps<Unit>) {
         <NumberField label="Damage" help="damage" min={0} max={20} value={u.damage} onChange={(damage) => set({ damage })} />
         <NumberField label="Defense" help="defense" min={1} max={7} value={u.defense} onChange={(defense) => set({ defense })} />
         <SelectField label="Defense type" help="defenseType" value={u.defenseType} onChange={(defenseType) => set({ defenseType })} options={DEFENSE_TYPES.map((d) => ({ value: d, label: d }))} />
-        <NumberField label="Speed" help="speed" min={0} max={10} value={u.speed} onChange={(speed) => set({ speed })} />
+        <NumberField label="Speed" help="speed" min={1} max={10} value={u.speed} onChange={(speed) => set({ speed })} />
         <NumberField label="Toughness" help="toughness" min={1} max={50} value={u.toughness} onChange={(toughness) => set({ toughness })} />
         <NumberField label="Wounds" help="wounds" min={1} max={50} value={u.wounds ?? 1} onChange={(wounds) => set({ wounds })} />
       </div>
@@ -49,7 +50,7 @@ function UnitEditor({ value: u, onChange }: EditorProps<Unit>) {
       <PickList
         label="Special abilities"
         help="abilities"
-        items={abilities}
+        items={abilities.filter((a) => !a.bossCard)}
         selected={u.abilityIds}
         onChange={(abilityIds) => set({ abilityIds })}
         extra={(a) => `(${abilityCostLabel(a)})`}
@@ -57,8 +58,20 @@ function UnitEditor({ value: u, onChange }: EditorProps<Unit>) {
       />
 
       <h3 className="label-text">
+        Boss <HelpTip rule="isBoss" />
+      </h3>
+      <Checkbox label="This unit is a boss" help="isBoss" checked={!!u.isBoss} onChange={(isBoss) => set({ isBoss })} />
+      {u.isBoss && (
+        <>
+          <NumberField label="Boss activations per round" help="bossActivations" min={1} max={5} value={u.bossActivations ?? 1} onChange={(bossActivations) => set({ bossActivations })} />
+          <BossDeckEditor deck={u.bossDeck ?? []} cards={abilities.filter((a) => a.bossCard)} onChange={(bossDeck) => set({ bossDeck })} />
+        </>
+      )}
+
+      <h3 className="label-text">
         Miniatures & spawning <HelpTip rule="spawnBudget" />
       </h3>
+      {u.isBoss && <p className="muted small">Bosses never spawn normally; they only appear when an objective summons them.</p>}
       <div className="grid3">
         <NumberField label="Miniatures owned" help="count" min={0} max={200} value={u.count} onChange={(count) => set({ count })} />
         <NumberField label="Spawn priority" help="priority" min={1} max={10} value={u.spawn.priority} onChange={(priority) => setSpawn({ priority })} />
@@ -93,7 +106,7 @@ export function UnitsPage() {
           <div className="grow">
             <div className="row between">
               <strong>
-                {u.name} <MiniCount count={u.count} />
+                {u.name} <MiniCount count={u.count} /> {u.isBoss && <span className="badge boss-badge">Boss</span>}
               </strong>
               <span className="points">{unitPoints(u, abilities)} pts</span>
             </div>

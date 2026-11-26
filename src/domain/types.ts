@@ -16,6 +16,10 @@ export type CostType = 'add' | 'multiply';
 export interface Ability extends Entity {
   name: string;
   description: string;
+  /** A boss deck card (drawn when a boss activates) instead of a unit ability; has no point cost. */
+  bossCard?: boolean;
+  /** Groups abilities / boss cards, e.g. "Goblin Warlord". */
+  collection?: string;
   /** 'add' (default): `points` are added. 'multiply': unit points are multiplied by `multiplier`. */
   costType?: CostType;
   points: number;
@@ -39,6 +43,12 @@ export interface Unit extends Entity {
   speed: number;
   /** Damage needed to kill the unit. */
   toughness: number;
+  /** A boss: never spawns normally, only when an objective summons it; acts through its boss deck. */
+  isBoss?: boolean;
+  /** Boss activation cards put into the activation deck each round while the boss is alive. Missing = 1. */
+  bossActivations?: number;
+  /** The boss deck: boss card abilities and how many copies of each. */
+  bossDeck?: BossDeckEntry[];
   /** Attacks per activation (each a separate defense roll). Missing = 1. */
   attacks?: number;
   /** Wounds: each takes Toughness damage to remove. Missing = 1. */
@@ -52,6 +62,11 @@ export interface Unit extends Entity {
     groupedWith: string[];
     minSpawn: number;
   };
+}
+
+export interface BossDeckEntry {
+  abilityId: string;
+  copies: number;
 }
 
 export interface EnemyList extends Entity {
@@ -76,10 +91,10 @@ export interface MapTile extends Entity {
 }
 
 export interface TileMarker {
-  /** Label on the physical tile, e.g. "A" or "1". */
+  /** Name of the location printed on the tile, e.g. "Altar". Objectives are placed on markers by name. */
   label: string;
-  /** Kind of location, e.g. "Altar", "Chest", "Door". Objectives match on this. */
-  type: string;
+  /** Older data: markers had a separate type (e.g. label "A", type "Altar"); the type is used as the name. */
+  type?: string;
 }
 
 export interface MapSet extends Entity {
@@ -92,9 +107,12 @@ export interface MapSet extends Entity {
 export interface Objective extends Entity {
   name: string;
   description: string;
-  /** 'marker' (default): on a random marker of `markerType`. 'tile': on the objective location of a random tile. */
-  placement?: 'marker' | 'tile';
-  /** Marker type the objective is placed on. Empty = the objective location of a random tile. */
+  /**
+   * 'marker' (default): on a random marker named `markerType`. 'tile': on the objective
+   * location of a random tile. 'none': not on the map (e.g. "Slay the Warlord").
+   */
+  placement?: 'marker' | 'tile' | 'none';
+  /** Name of the marker the objective is placed on (e.g. "Altar"). Empty = the objective location of a random tile. */
   markerType: string;
   /** Story text read out when the objective is discovered (shown in italics). */
   flavour?: string;
@@ -112,6 +130,14 @@ export interface Objective extends Entity {
   lockedFlavour?: string;
   /** Instruction shown if the objective is found before its prerequisite is completed. */
   lockedText?: string;
+  /** Boss unit this objective summons. */
+  summonBossId?: string;
+  /** When the boss appears: when the objective is found (default) or completed. */
+  summonWhen?: 'found' | 'completed';
+  /** Where the boss appears: at this objective (default) or on a random tile in play. */
+  summonAt?: 'objective' | 'random';
+  /** This objective is completed automatically when this boss is defeated. */
+  defeatBossId?: string;
 }
 
 export interface Mission extends Entity {

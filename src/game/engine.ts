@@ -1,6 +1,7 @@
 // Pure game logic: no UI, no database. Every action takes a snapshot and
 // returns a new one, which makes save/load and undo trivial.
 import { startTileIdOf } from '../domain/mapSets';
+import { markerName } from '../domain/markers';
 import { objectiveMarkerType } from '../domain/objectives';
 import { unitPoints } from '../domain/points';
 import type { Ability, Difficulty, EnemyList, MapSet, MapTile, Mission, Objective, Unit } from '../domain/types';
@@ -15,6 +16,8 @@ export interface GameCatalog {
   abilities: Ability[];
   mapSet: MapSet;
   tiles: MapTile[];
+  /** Boss units the mission's objectives can summon (games saved before bosses have none). */
+  bosses?: Unit[];
 }
 
 export interface GameConfig {
@@ -22,11 +25,12 @@ export interface GameConfig {
   heroCount: number;
 }
 
-export type ActivationCard = { kind: 'hero' } | { kind: 'enemy' } | { kind: 'spawn' };
+export type ActivationCard = { kind: 'hero' } | { kind: 'enemy' } | { kind: 'spawn' } | { kind: 'boss'; bossId: string };
 
 export interface Placement {
   objectiveId: string;
   tileId: string;
+  /** Name of the marker the objective is on (e.g. "Altar"). */
   markerLabel?: string;
 }
 
@@ -45,11 +49,16 @@ export type GameEvent =
   | { kind: 'activate'; tileIds: string[]; replacedSpawn?: boolean }
   /** `replacedActivation`: an enemy activation card drawn while no enemies were on the board. */
   | { kind: 'spawn'; tileIds: string[]; spawns: SpawnResult[]; replacedActivation?: boolean }
-  | { kind: 'tile'; tileId: string; placements: Placement[]; locked?: Placement[] }
+  /** `replaced`: the tile drawn before this one, which couldn't be placed and went back into the deck. */
+  | { kind: 'tile'; tileId: string; placements: Placement[]; locked?: Placement[]; replaced?: string }
   | { kind: 'tileDeckEmpty' }
   | { kind: 'enemiesChanged'; unitId: string; delta: number }
   /** `revealed`: objectives unlocked by completing this one whose tile is already explored. */
-  | { kind: 'objective'; objectiveId: string; completed: boolean; revealed?: Placement[] };
+  | { kind: 'objective'; objectiveId: string; completed: boolean; revealed?: Placement[] }
+  | { kind: 'bossAppears'; bossId: string; objectiveId: string; tileId: string; markerLabel?: string }
+  /** `cardId`: the boss deck card drawn ('' if the boss has no cards); `reshuffled`: the boss deck was reshuffled first. */
+  | { kind: 'bossActivation'; bossId: string; cardId: string; reshuffled?: boolean }
+  | { kind: 'bossDefeated'; bossId: string; completed: string[]; revealed?: Placement[] };
 
 export interface GameSnapshot {
   rng: number;
@@ -63,6 +72,10 @@ export interface GameSnapshot {
   inPlay: Record<string, number>;
   placements: Placement[];
   completedObjectives: string[];
+  /** Bosses on the board, with their boss deck (draw pile and discard pile of ability ids). */
+  bosses?: Record<string, { drawPile: string[]; discard: string[] }>;
+  /** Bosses that have been summoned in this game (each appears only once). */
+  bossesSummoned?: string[];
   /** One entry per player action; the last entry is what the app shows now. */
   log: GameEvent[][];
 }
@@ -95,16 +108,24 @@ export function enemyCardCount(heroCount: number, difficulty: Difficulty): numbe
   return Math.min(wanted, heroCount + d.spawnCards);
 }
 
+/** Enemy and boss activation cards: these are never drawn back to back. */
+export const isActivationCard = (kind?: ActivationCard['kind']) => kind === 'enemy' || kind === 'boss';
+
 /**
  * One round's deck. Hero cards are generic: any hero who still has their
  * activation token ready may act, so there is one hero card per hero.
  *
- * Enemy activation cards are never placed next to each other: the other
- * cards are shuffled and each enemy card goes into a different gap between
- * them. If the previous round ended on an enemy card, the deck won't start
- * with one either.
+ * Enemy and boss activation cards are never placed next to each other: the
+ * other cards are shuffled and each activation card goes into a different gap
+ * between them. If the previous round ended on one, the deck won't start with
+ * one either. Boss cards always get a place; enemy cards fill the rest.
  */
-export function buildActivationDeck(config: GameConfig, rng: Rng, previousCard?: ActivationCard['kind']): ActivationCard[] {
+export function buildActivationDeck(
+  config: GameConfig,
+  rng: Rng,
+  previousCard?: ActivationCard['kind'],
+  bossCards: ActivationCard[] = [],
+): ActivationCard[] {
   const d = DIFFICULTY[config.difficulty];
   const others: ActivationCard[] = [];
   for (let i = 0; i < config.heroCount; i++) others.push({ kind: 'hero' });
@@ -113,16 +134,88 @@ export function buildActivationDeck(config: GameConfig, rng: Rng, previousCard?:
 
   // Gap i = position before shuffled[i]; gap n = after the last card.
   const allowedGaps = Array.from({ length: shuffled.length + 1 }, (_, i) => i).filter(
-    (g) => !(g === 0 && previousCard === 'enemy' && shuffled.length > 0),
+    (g) => !(g === 0 && isActivationCard(previousCard) && shuffled.length > 0),
   );
-  const enemyGaps = new Set(rng.sample(allowedGaps, enemyCardCount(config.heroCount, config.difficulty)));
+  const enemies: ActivationCard[] = Array.from({ length: enemyCardCount(config.heroCount, config.difficulty) }, () => ({ kind: 'enemy' }));
+  const acts = rng.shuffle([...bossCards, ...enemies].slice(0, allowedGaps.length));
+  const gaps = rng.sample(allowedGaps, acts.length);
+  const inGap = new Map(gaps.map((g, i) => [g, acts[i]]));
 
   const deck: ActivationCard[] = [];
   for (let g = 0; g <= shuffled.length; g++) {
-    if (enemyGaps.has(g)) deck.push({ kind: 'enemy' });
+    const act = inGap.get(g);
+    if (act) deck.push(act);
     if (g < shuffled.length) deck.push(shuffled[g]);
   }
   return deck;
+}
+
+// ---- Bosses ---------------------------------------------------------------
+
+export const bossesOf = (cat: GameCatalog): Unit[] => cat.bosses ?? [];
+
+/** A unit of this game: from the enemy list or one of the bosses. */
+export function findUnit(cat: GameCatalog, id: string): Unit | undefined {
+  return cat.units.find((u) => u.id === id) ?? bossesOf(cat).find((u) => u.id === id);
+}
+
+/** Activation cards for the bosses on the board, for a new round. */
+function bossCardsFor(s: GameSnapshot, cat: GameCatalog): ActivationCard[] {
+  return Object.keys(s.bosses ?? {}).flatMap((bossId) => {
+    const n = Math.max(1, findUnit(cat, bossId)?.bossActivations ?? 1);
+    return Array.from({ length: n }, () => ({ kind: 'boss' as const, bossId }));
+  });
+}
+
+/** Put a card into the remaining deck where it isn't next to another activation card (skipped if there is no such place). */
+function insertSpaced(deck: ActivationCard[], card: ActivationCard, rng: Rng, lastCard?: ActivationCard['kind']): ActivationCard[] {
+  const ok = Array.from({ length: deck.length + 1 }, (_, i) => i).filter((i) => {
+    const before = i === 0 ? lastCard : deck[i - 1].kind;
+    return !isActivationCard(before) && !isActivationCard(deck[i]?.kind);
+  });
+  if (!ok.length) return deck;
+  const at = ok[rng.int(ok.length)];
+  return [...deck.slice(0, at), card, ...deck.slice(at)];
+}
+
+/**
+ * Bosses summoned by these objectives at this moment ('found' or 'completed').
+ * The boss is placed, gets its shuffled boss deck, and its activation cards are
+ * shuffled into the remaining activation deck. Each boss appears only once.
+ */
+function summonBosses(
+  s: GameSnapshot,
+  cat: GameCatalog,
+  objectiveIds: string[],
+  when: 'found' | 'completed',
+  rng: Rng,
+): { s: GameSnapshot; events: GameEvent[] } {
+  const events: GameEvent[] = [];
+  for (const objectiveId of objectiveIds) {
+    const o = cat.objectives.find((x) => x.id === objectiveId);
+    if (!o?.summonBossId || (o.summonWhen ?? 'found') !== when) continue;
+    const boss = bossesOf(cat).find((u) => u.id === o.summonBossId);
+    if (!boss || s.bossesSummoned?.includes(boss.id) || !s.tilesInPlay.length) continue;
+    const placement = s.placements.find((p) => p.objectiveId === objectiveId);
+    const atObjective = (o.summonAt ?? 'objective') === 'objective' && !!placement?.tileId;
+    const tileId = atObjective ? placement!.tileId : rng.sample(s.tilesInPlay, 1)[0];
+    const cards = (boss.bossDeck ?? [])
+      .filter((c) => cat.abilities.some((a) => a.id === c.abilityId))
+      .flatMap((c) => Array.from({ length: Math.max(1, c.copies) }, () => c.abilityId));
+    let activationDeck = s.activationDeck;
+    for (let i = 0; i < Math.max(1, boss.bossActivations ?? 1); i++) {
+      activationDeck = insertSpaced(activationDeck, { kind: 'boss', bossId: boss.id }, rng, s.lastCard);
+    }
+    s = {
+      ...s,
+      activationDeck,
+      inPlay: { ...s.inPlay, [boss.id]: 1 },
+      bosses: { ...(s.bosses ?? {}), [boss.id]: { drawPile: rng.shuffle(cards), discard: [] } },
+      bossesSummoned: [...(s.bossesSummoned ?? []), boss.id],
+    };
+    events.push({ kind: 'bossAppears', bossId: boss.id, objectiveId, tileId, ...(atObjective && placement?.markerLabel ? { markerLabel: placement.markerLabel } : {}) });
+  }
+  return { s, events };
 }
 
 function placeObjectives(cat: GameCatalog, rng: Rng): Placement[] {
@@ -138,16 +231,21 @@ function placeObjectives(cat: GameCatalog, rng: Rng): Placement[] {
 
   const tilesWithObjective = () => new Set(placements.map((p) => p.tileId));
   for (const obj of objectives) {
+    if (obj.placement === 'none') {
+      placements.push({ objectiveId: obj.id, tileId: '' }); // not on the map
+      continue;
+    }
     const type = objectiveMarkerType(obj).toLowerCase();
     if (type) {
       const options = tiles.flatMap((t) =>
         t.markers
-          .filter((m) => m.type.trim().toLowerCase() === type && !used.has(`${t.id}:${m.label}`))
-          .map((m) => ({ tileId: t.id, markerLabel: m.label })),
+          .map((m, i) => ({ name: markerName(m), key: `${t.id}:${i}` }))
+          .filter((m) => m.name.toLowerCase() === type && !used.has(m.key))
+          .map((m) => ({ tileId: t.id, markerLabel: m.name, key: m.key })),
       );
       if (options.length) {
-        const pick = options[rng.int(options.length)];
-        used.add(`${pick.tileId}:${pick.markerLabel}`);
+        const { key, ...pick } = options[rng.int(options.length)];
+        used.add(key);
         placements.push({ objectiveId: obj.id, ...pick });
         continue;
       }
@@ -169,7 +267,7 @@ export function createGame(config: GameConfig, cat: GameCatalog, seed: number): 
   const tileDeck = rng.shuffle(cat.mapSet.tileIds.filter((id) => id !== startTileId));
   const activationDeck = buildActivationDeck(config, rng);
   const startFound = foundObjectives({ placements, tilesInPlay: startTileId ? [startTileId] : [], completedObjectives: [] }, cat);
-  return {
+  const game: GameSnapshot = {
     rng: rng.state,
     round: 1,
     activationDeck,
@@ -178,6 +276,12 @@ export function createGame(config: GameConfig, cat: GameCatalog, seed: number): 
     inPlay: {},
     placements,
     completedObjectives: [],
+    log: [],
+  };
+  const summoned = summonBosses(game, cat, [...startFound], 'found', rng);
+  return {
+    ...summoned.s,
+    rng: rng.state,
     log: [
       [
         {
@@ -186,6 +290,7 @@ export function createGame(config: GameConfig, cat: GameCatalog, seed: number): 
           placements: placements.filter((p) => startFound.has(p.objectiveId)),
           locked: placements.filter((p) => p.tileId === startTileId && !startFound.has(p.objectiveId)),
         },
+        ...summoned.events,
       ],
     ],
   };
@@ -200,11 +305,12 @@ export function drawActivation(s: GameSnapshot, config: GameConfig, cat: GameCat
   let round = s.round;
   if (deck.length === 0) {
     round += 1;
-    deck = buildActivationDeck(config, rng, s.lastCard);
+    deck = buildActivationDeck(config, rng, s.lastCard, bossCardsFor(s, cat));
     events.push({ kind: 'round', round });
   }
   const [drawn, ...rest] = deck;
   let inPlay = s.inPlay;
+  let bosses = s.bosses;
 
   // With no enemies on the board, an enemy activation card becomes a spawn card.
   const replacedActivation = drawn.kind === 'enemy' && enemiesOnBoard(s) === 0;
@@ -212,7 +318,20 @@ export function drawActivation(s: GameSnapshot, config: GameConfig, cat: GameCat
 
   if (kind === 'hero') {
     events.push({ kind: 'hero' });
-  } else if (kind === 'enemy') {
+  } else if (drawn.kind === 'boss' && s.bosses?.[drawn.bossId]) {
+    // The boss acts: draw the top card of its boss deck (reshuffle the discards when empty).
+    const b = s.bosses[drawn.bossId];
+    let drawPile = b.drawPile;
+    let discard = b.discard;
+    const reshuffled = drawPile.length === 0 && discard.length > 0;
+    if (reshuffled) {
+      drawPile = rng.shuffle(discard);
+      discard = [];
+    }
+    const [cardId = '', ...restPile] = drawPile;
+    bosses = { ...s.bosses, [drawn.bossId]: { drawPile: restPile, discard: cardId ? [...discard, cardId] : discard } };
+    events.push({ kind: 'bossActivation', bossId: drawn.bossId, cardId, ...(reshuffled ? { reshuffled } : {}) });
+  } else if (kind === 'enemy' || kind === 'boss') {
     events.push({ kind: 'activate', tileIds: rng.sample(s.tilesInPlay, activationTileCount(s.tilesInPlay.length)) });
   } else if (!canAnythingSpawn(inPlay, cat)) {
     // No miniatures left to spawn: the spawn card activates the enemies on a single tile instead.
@@ -225,7 +344,7 @@ export function drawActivation(s: GameSnapshot, config: GameConfig, cat: GameCat
     events.push({ kind: 'spawn', tileIds, spawns, ...(replacedActivation ? { replacedActivation } : {}) });
   }
 
-  return { ...s, rng: rng.state, round, activationDeck: rest, lastCard: kind, inPlay, log: [...s.log, events] };
+  return { ...s, rng: rng.state, round, activationDeck: rest, lastCard: kind, inPlay, bosses, log: [...s.log, events] };
 }
 
 export function enemiesOnBoard(s: GameSnapshot): number {
@@ -234,7 +353,7 @@ export function enemiesOnBoard(s: GameSnapshot): number {
 
 /** Is there any unit with enough free miniatures for at least its minimum spawn number? */
 export function canAnythingSpawn(inPlay: Record<string, number>, cat: GameCatalog): boolean {
-  return cat.units.some((u) => u.count - (inPlay[u.id] ?? 0) >= Math.max(1, u.spawn.minSpawn));
+  return cat.units.some((u) => !u.isBoss && u.count - (inPlay[u.id] ?? 0) >= Math.max(1, u.spawn.minSpawn));
 }
 
 /** Mutates `inPlay`. Returns what to put on the tile. */
@@ -259,13 +378,13 @@ export function spawnOnTile(
     return budgetLeft - n * pts;
   };
 
-  const primary = rng.weighted(cat.units.filter(canSpawn), (u) => u.spawn.priority);
+  const primary = rng.weighted(cat.units.filter((u) => !u.isBoss && canSpawn(u)), (u) => u.spawn.priority);
   if (!primary) return results;
   let left = spawn(primary, budget);
 
   for (const id of primary.spawn.groupedWith) {
     const g = cat.units.find((u) => u.id === id);
-    if (!g || g.id === primary.id || !canSpawn(g)) continue;
+    if (!g || g.isBoss || g.id === primary.id || !canSpawn(g)) continue;
     if (left < points.get(g.id)! * Math.max(1, g.spawn.minSpawn)) continue;
     left = spawn(g, left);
   }
@@ -277,7 +396,41 @@ export function exploreTile(s: GameSnapshot, cat: GameCatalog): GameSnapshot {
   const [tileId, ...rest] = s.tileDeck;
   const next = { ...s, tileDeck: rest, tilesInPlay: [...s.tilesInPlay, tileId] };
   const locked = s.placements.filter((p) => p.tileId === tileId && !isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat));
-  return { ...next, log: [...s.log, [{ kind: 'tile', tileId, placements: newlyFound(s, next, cat), locked }]] };
+  const placements = newlyFound(s, next, cat);
+  const rng = new Rng(s.rng);
+  const summoned = summonBosses(next, cat, placements.map((p) => p.objectiveId), 'found', rng);
+  return { ...summoned.s, rng: rng.state, log: [...s.log, [{ kind: 'tile', tileId, placements, locked }, ...summoned.events]] };
+}
+
+/** The tile drawn by the latest action, if that action was exploring. */
+function lastExploredTile(s: GameSnapshot): string | undefined {
+  const e = s.log[s.log.length - 1]?.find((x) => x.kind === 'tile');
+  return e?.kind === 'tile' ? e.tileId : undefined;
+}
+
+/** Can the tile just drawn be swapped for another one? */
+export function canRedrawTile(s: GameSnapshot): boolean {
+  return lastExploredTile(s) !== undefined && s.tileDeck.length > 0;
+}
+
+/**
+ * The tile just drawn can't be placed legally (e.g. it would close off the
+ * map): put it back into the tile deck at a random position (never on top)
+ * and draw another one.
+ */
+export function redrawTile(s: GameSnapshot, cat: GameCatalog): GameSnapshot {
+  const old = lastExploredTile(s);
+  if (!old || s.tileDeck.length === 0) return s;
+  const rng = new Rng(s.rng);
+  const tileDeck = [...s.tileDeck];
+  // Below the replacement that is drawn next, so it never ends up on top again
+  // (unless it is the only other tile left).
+  const minPos = Math.min(2, tileDeck.length);
+  tileDeck.splice(minPos + rng.int(tileDeck.length - minPos + 1), 0, old);
+  const back: GameSnapshot = { ...s, rng: rng.state, tileDeck, tilesInPlay: s.tilesInPlay.filter((id) => id !== old) };
+  const next = exploreTile(back, cat);
+  const entry = next.log[next.log.length - 1].map((e) => (e.kind === 'tile' ? { ...e, replaced: old } : e));
+  return { ...next, log: [...next.log.slice(0, -1), entry] };
 }
 
 // ---- Objective chains ------------------------------------------------------
@@ -294,12 +447,12 @@ export function isObjectiveUnlocked(objectiveId: string, completed: string[], ca
   return completed.includes(o.revealedBy);
 }
 
-/** Objectives that are found: unlocked and their tile has been explored. */
+/** Objectives that are found: unlocked and their tile has been explored (objectives not on the map: as soon as unlocked). */
 export function foundObjectives(s: Pick<GameSnapshot, 'placements' | 'tilesInPlay' | 'completedObjectives'>, cat: GameCatalog): Set<string> {
   const inPlay = new Set(s.tilesInPlay);
   return new Set(
     s.placements
-      .filter((p) => inPlay.has(p.tileId) && isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat))
+      .filter((p) => (p.tileId === '' || inPlay.has(p.tileId)) && isObjectiveUnlocked(p.objectiveId, s.completedObjectives, cat))
       .map((p) => p.objectiveId),
   );
 }
@@ -321,10 +474,11 @@ function newlyFound(before: GameSnapshot, after: GameSnapshot, cat: GameCatalog)
   return after.placements.filter((p) => now.has(p.objectiveId) && !was.has(p.objectiveId));
 }
 
-/** Record miniatures killed (negative delta) or added by hand (positive delta). */
+/** Record miniatures killed (negative delta) or added by hand (positive delta). Removing a boss defeats it. */
 export function changeEnemies(s: GameSnapshot, cat: GameCatalog, unitId: string, delta: number): GameSnapshot {
-  const unit = cat.units.find((u) => u.id === unitId);
+  const unit = findUnit(cat, unitId);
   if (!unit) return s;
+  if (unit.isBoss) return delta < 0 ? defeatBoss(s, cat, unitId) : s; // bosses only arrive through objectives
   const current = s.inPlay[unitId] ?? 0;
   const next = Math.min(unit.count, Math.max(0, current + delta));
   if (next === current) return s;
@@ -335,18 +489,60 @@ export function changeEnemies(s: GameSnapshot, cat: GameCatalog, unitId: string,
   };
 }
 
-/** Mark an objective complete (or reopen it). Completing one can reveal the objectives it unlocks. */
-export function toggleObjective(s: GameSnapshot, cat: GameCatalog, objectiveId: string): GameSnapshot {
-  const completed = !s.completedObjectives.includes(objectiveId);
-  const next = {
+/**
+ * Complete objectives and apply what follows: objectives they unlock (with a
+ * tile already on the table) are revealed, and bosses summoned on completion
+ * or on finding the revealed ones appear.
+ */
+function completeObjectives(
+  s: GameSnapshot,
+  cat: GameCatalog,
+  ids: string[],
+  rng: Rng,
+): { s: GameSnapshot; revealed: Placement[]; events: GameEvent[] } {
+  const next = { ...s, completedObjectives: [...s.completedObjectives, ...ids.filter((id) => !s.completedObjectives.includes(id))] };
+  const revealed = newlyFound(s, next, cat);
+  const a = summonBosses(next, cat, ids, 'completed', rng);
+  const b = summonBosses(a.s, cat, revealed.map((p) => p.objectiveId), 'found', rng);
+  return { s: b.s, revealed, events: [...a.events, ...b.events] };
+}
+
+/** The boss is killed: it leaves the board, its activation cards leave the deck, and linked objectives are completed. */
+function defeatBoss(s: GameSnapshot, cat: GameCatalog, bossId: string): GameSnapshot {
+  if (!(s.inPlay[bossId] ?? 0)) return s;
+  const rng = new Rng(s.rng);
+  const bosses = { ...(s.bosses ?? {}) };
+  delete bosses[bossId];
+  const base: GameSnapshot = {
     ...s,
-    completedObjectives: completed
-      ? [...s.completedObjectives, objectiveId]
-      : s.completedObjectives.filter((id) => id !== objectiveId),
+    inPlay: { ...s.inPlay, [bossId]: 0 },
+    bosses,
+    activationDeck: s.activationDeck.filter((c) => !(c.kind === 'boss' && c.bossId === bossId)),
   };
-  // Objectives unlocked now whose tile is already on the table are announced right away.
-  const revealed = completed ? newlyFound(s, next, cat) : [];
-  return { ...next, log: [...s.log, [{ kind: 'objective', objectiveId, completed, revealed }]] };
+  const ids = cat.objectives
+    .filter((o) => o.defeatBossId === bossId && cat.mission.objectiveIds.includes(o.id) && !s.completedObjectives.includes(o.id))
+    .map((o) => o.id);
+  const done = completeObjectives(base, cat, ids, rng);
+  return {
+    ...done.s,
+    rng: rng.state,
+    log: [...s.log, [{ kind: 'bossDefeated', bossId, completed: ids, revealed: done.revealed }, ...done.events]],
+  };
+}
+
+/** Mark an objective complete (or reopen it). Completing one can reveal the objectives it unlocks and summon bosses. */
+export function toggleObjective(s: GameSnapshot, cat: GameCatalog, objectiveId: string): GameSnapshot {
+  if (s.completedObjectives.includes(objectiveId)) {
+    const next = { ...s, completedObjectives: s.completedObjectives.filter((id) => id !== objectiveId) };
+    return { ...next, log: [...s.log, [{ kind: 'objective', objectiveId, completed: false, revealed: [] }]] };
+  }
+  const rng = new Rng(s.rng);
+  const done = completeObjectives(s, cat, [objectiveId], rng);
+  return {
+    ...done.s,
+    rng: rng.state,
+    log: [...s.log, [{ kind: 'objective', objectiveId, completed: true, revealed: done.revealed }, ...done.events]],
+  };
 }
 
 /** Pick a random entry, used for the "Random" options in the play setup. */

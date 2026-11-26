@@ -1,31 +1,50 @@
 import type { Ability, Unit } from './types';
 
-// Automatic point values. All rolls are assumed to be d6 "X+" rolls.
-// Tune the constants here to rebalance every unit at once.
-const THREAT_WEIGHT = 4;
-const SPEED_WEIGHT = 2;
-const DEFENSE_TYPE_MULTIPLIER = { None: 1, Evasive: 1.15, Armored: 1.15 } as const;
+// Automatic point values. Tune the constants here to rebalance every unit at once.
+//
+//   points = SCALE × (expected damage dealt + expected damage to take out) × speed factor
+//
+// The hero rolls a d6 against Strength (to deflect) and Defense (to do damage):
+// a value x stands for a (x − 1)/6 chance, so higher values are always better.
+const SCALE = 10;
+/** A defense type is a disadvantage: heroes get bonuses against it. */
+const DEFENSE_TYPE_FACTOR = { None: 1, Evasive: 0.75, Armored: 0.75 } as const;
 
-/** Chance that a d6 roll of `target`+ succeeds. */
-export function chance(target: number): number {
-  return Math.min(1, Math.max(1 / 6, (7 - target) / 6));
+/** Dice chance of a stat value: 2 → 1/6, 3 → 2/6 … 7 → 6/6. */
+export function diceChance(value: number): number {
+  return Math.min(1, Math.max(0, (value - 1) / 6));
 }
 
 export const attacksOf = (u: Pick<Unit, 'attacks'>) => Math.max(1, u.attacks ?? 1);
 export const woundsOf = (u: Pick<Unit, 'wounds'>) => Math.max(1, u.wounds ?? 1);
 
-/** Expected damage per activation against a hero (all attacks). */
-export function threat(u: Pick<Unit, 'strength' | 'damage' | 'attacks'>): number {
-  return u.damage * (1 - chance(u.strength)) * attacksOf(u);
+/**
+ * Heroes spend a defence die on every attack, so more attacks weigh more than
+ * more damage: each attack above the first adds ×1.5, each damage point above
+ * the first adds ×0.75 (a unit with 1 attack and 1 damage counts as 1).
+ */
+const EXTRA_ATTACK_WEIGHT = 1.5;
+const EXTRA_DAMAGE_WEIGHT = 0.75;
+export const attackValue = (u: Pick<Unit, 'attacks'>) => 1 + EXTRA_ATTACK_WEIGHT * (attacksOf(u) - 1);
+export const damageValue = (u: Pick<Unit, 'damage'>) => (u.damage <= 0 ? 0 : 1 + EXTRA_DAMAGE_WEIGHT * (u.damage - 1));
+
+/** Expected damage dealt: attack value × damage value × dice chance of Strength. */
+export function damageDealt(u: Pick<Unit, 'strength' | 'damage' | 'attacks'>): number {
+  return attackValue(u) * damageValue(u) * diceChance(u.strength);
 }
 
-/** Expected number of hero attacks needed to kill the unit (all wounds). */
-export function durability(u: Pick<Unit, 'defense' | 'toughness' | 'defenseType' | 'wounds'>): number {
-  return ((u.toughness * woundsOf(u)) / chance(u.defense)) * DEFENSE_TYPE_MULTIPLIER[u.defenseType];
+/** Expected damage to take out: Toughness × Wounds × dice chance of Defense (× 0.75 with a defense type). */
+export function damageToTakeOut(u: Pick<Unit, 'defense' | 'toughness' | 'defenseType' | 'wounds'>): number {
+  return u.toughness * woundsOf(u) * diceChance(u.defense) * DEFENSE_TYPE_FACTOR[u.defenseType];
+}
+
+/** 1 + (Speed − 2) / 4: Speed 1 → ×0.75, 2 → ×1, 3 → ×1.25, 4 → ×1.5. Units always move (Speed ≥ 1). */
+export function speedFactor(u: Pick<Unit, 'speed'>): number {
+  return 1 + (Math.max(1, u.speed) - 2) / 4;
 }
 
 export function basePoints(u: Unit): number {
-  return Math.round(THREAT_WEIGHT * threat(u) * durability(u) + SPEED_WEIGHT * u.speed);
+  return Math.round(SCALE * (damageDealt(u) + damageToTakeOut(u)) * speedFactor(u));
 }
 
 function unitAbilities(u: Unit, abilities: Ability[]): Ability[] {

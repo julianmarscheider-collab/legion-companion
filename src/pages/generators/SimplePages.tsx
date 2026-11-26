@@ -9,32 +9,47 @@ import { factionsOf } from './UnitsPage';
 import { newEntity, repos } from '../../data/repositories';
 import { useCollection } from '../../data/useCollection';
 import { startTileIdOf, startTilesOf, startTileWarning } from '../../domain/mapSets';
+import { markerName, markerNamesOf } from '../../domain/markers';
 import { placementLabel, questlinesOf } from '../../domain/objectives';
 import { abilityCostLabel, isMultiplier, unitPoints } from '../../domain/points';
 import type { Ability, CostType, EnemyList, MapSet, MapTile, Mission, Objective } from '../../domain/types';
 
 // ---- Abilities --------------------------------------------------------------
 
+/** All collection names used by these abilities / boss cards, sorted. */
+export function abilityCollectionsOf(abilities: Ability[]): string[] {
+  return [...new Set(abilities.map((a) => (a.collection ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
+
 function AbilityEditor({ value: a, onChange }: EditorProps<Ability>) {
+  const all = useCollection(repos.abilities);
   return (
     <div className="form">
-      <TextField label="Name" value={a.name} onChange={(name) => onChange({ ...a, name })} />
-      <SelectField<CostType>
-        label="Cost type"
-        help="abilityCostType"
-        value={a.costType ?? 'add'}
-        onChange={(costType) => onChange({ ...a, costType, multiplier: a.multiplier ?? 1.25 })}
-        options={[
-          { value: 'add', label: 'Additive: + points' },
-          { value: 'multiply', label: 'Multiplicative: × unit points' },
-        ]}
-      />
-      {isMultiplier(a) ? (
-        <NumberField label="Multiplier" help="abilityMultiplier" min={0} max={10} step={0.05} value={a.multiplier ?? 1} onChange={(multiplier) => onChange({ ...a, multiplier })} />
-      ) : (
-        <NumberField label="Points" help="abilityPoints" min={-100} max={500} value={a.points} onChange={(points) => onChange({ ...a, points })} />
+      <div className="grid2">
+        <TextField label="Name" value={a.name} onChange={(name) => onChange({ ...a, name })} />
+        <TextField label="Collection" help="abilityCollection" suggestions={abilityCollectionsOf(all)} value={a.collection ?? ''} onChange={(collection) => onChange({ ...a, collection })} placeholder="e.g. Goblin Warlord" />
+      </div>
+      <Checkbox label="Boss deck card" help="bossCard" checked={!!a.bossCard} onChange={(bossCard) => onChange({ ...a, bossCard })} />
+      {!a.bossCard && (
+        <>
+          <SelectField<CostType>
+            label="Cost type"
+            help="abilityCostType"
+            value={a.costType ?? 'add'}
+            onChange={(costType) => onChange({ ...a, costType, multiplier: a.multiplier ?? 1.25 })}
+            options={[
+              { value: 'add', label: 'Additive: + points' },
+              { value: 'multiply', label: 'Multiplicative: × unit points' },
+            ]}
+          />
+          {isMultiplier(a) ? (
+            <NumberField label="Multiplier" help="abilityMultiplier" min={0} max={10} step={0.05} value={a.multiplier ?? 1} onChange={(multiplier) => onChange({ ...a, multiplier })} />
+          ) : (
+            <NumberField label="Points" help="abilityPoints" min={-100} max={500} value={a.points} onChange={(points) => onChange({ ...a, points })} />
+          )}
+        </>
       )}
-      <TextArea label="Rules text" help="abilityText" rows={5} value={a.description} onChange={(description) => onChange({ ...a, description })} />
+      <TextArea label={a.bossCard ? 'What the boss does' : 'Rules text'} help="abilityText" rows={5} value={a.description} onChange={(description) => onChange({ ...a, description })} />
     </div>
   );
 }
@@ -43,14 +58,26 @@ export function AbilitiesPage() {
   return (
     <CrudPage
       title="Abilities"
-      intro="Special abilities you can give to units, with their point cost."
+      intro="Special abilities you can give to units, and boss deck cards that are drawn when a boss activates."
       repo={repos.abilities}
-      create={(o) => ({ ...newEntity(o), name: '', description: '', points: 1 })}
+      create={(o) => ({ ...newEntity(o), name: '', collection: '', description: '', points: 1 })}
       Editor={AbilityEditor}
+      groups={[
+        { label: 'type', get: (a) => (a.bossCard ? 'Boss deck cards' : 'Abilities'), emptyLabel: '' },
+        { label: 'collection', get: (a) => a.collection ?? '', emptyLabel: 'No collection' },
+      ]}
       summary={(a) => (
         <div>
-          <div className="row between"><strong>{a.name}</strong><span className="points">{abilityCostLabel(a)}</span></div>
-          <small className="muted">{a.description}</small>
+          <div className="row between">
+            <strong>
+              {a.name} {a.bossCard && <span className="badge boss-badge">Boss card</span>}
+            </strong>
+            {!a.bossCard && <span className="points">{abilityCostLabel(a)}</span>}
+          </div>
+          <small className="muted unit-meta">
+            {a.collection && <i className="faction">{a.collection}</i>}
+            <span>{a.description}</span>
+          </small>
         </div>
       )}
     />
@@ -114,9 +141,8 @@ export function EnemyListsPage() {
 
 // ---- Objectives -------------------------------------------------------------
 
-function useMarkerTypes() {
-  const tiles = useCollection(repos.mapTiles);
-  return [...new Set(tiles.flatMap((t) => t.markers.map((m) => m.type)).filter(Boolean))].sort();
+function useMarkerNames() {
+  return markerNamesOf(useCollection(repos.mapTiles));
 }
 
 /** Objectives that (directly or through a chain) are revealed by `id`; picking one of them would make a loop. */
@@ -136,7 +162,8 @@ function revealedChain(id: string, all: Objective[]): Set<string> {
 }
 
 function ObjectiveEditor({ value: o, onChange }: EditorProps<Objective>) {
-  const markerTypes = useMarkerTypes();
+  const bosses = useCollection(repos.units).filter((u) => u.isBoss);
+  const markerTypes = useMarkerNames();
   const objectives = useCollection(repos.objectives);
   const loop = revealedChain(o.id, objectives);
   const candidates = objectives.filter((x) => x.id !== o.id && !loop.has(x.id));
@@ -164,22 +191,64 @@ function ObjectiveEditor({ value: o, onChange }: EditorProps<Objective>) {
           <TextArea label="Text (prerequisite not fulfilled)" help="objectiveLockedText" rows={3} value={o.lockedText ?? ''} onChange={(lockedText) => onChange({ ...o, lockedText })} placeholder="e.g. The cell door is locked. It can't be opened until a key is found." />
         </>
       )}
-      <SelectField<'marker' | 'tile'>
+      <SelectField<'marker' | 'tile' | 'none'>
         label="Placed on"
         help="objectivePlacement"
         value={o.placement ?? 'marker'}
         onChange={(placement) => onChange({ ...o, placement })}
         options={[
-          { value: 'marker', label: 'A marker of a certain type' },
+          { value: 'marker', label: 'A marker (by name)' },
           { value: 'tile', label: 'The objective location of a random tile' },
+          { value: 'none', label: 'Not on the map (e.g. defeat a boss)' },
         ]}
       />
-      {o.placement !== 'tile' && (
-        <TextField label="Marker type" help="markerType" suggestions={markerTypes} value={o.markerType} onChange={(markerType) => onChange({ ...o, markerType })} placeholder="e.g. Altar" />
+      {(o.placement ?? 'marker') === 'marker' && (
+        <TextField label="Marker" help="markerType" suggestions={markerTypes} value={o.markerType} onChange={(markerType) => onChange({ ...o, markerType })} placeholder="e.g. Altar" />
       )}
       <TextArea label="Flavour text" help="objectiveFlavour" rows={4} value={o.flavour ?? ''} onChange={(flavour) => onChange({ ...o, flavour })} placeholder="e.g. A foul smell rises from the cracked altar…" />
       <TextArea label="Setup when revealed" help="objectiveSetup" value={o.setup} onChange={(setup) => onChange({ ...o, setup })} placeholder="What the players place on the board" />
       <TextArea label="How to complete it" help="objectiveCompletion" value={o.completion} onChange={(completion) => onChange({ ...o, completion })} />
+      <fieldset>
+        <legend>
+          <LabelText label="Boss" help="summonBoss" />
+        </legend>
+        <SelectField
+          label="Summons a boss"
+          value={o.summonBossId ?? ''}
+          onChange={(summonBossId) => onChange({ ...o, summonBossId })}
+          options={[{ value: '', label: '— no boss —' }, ...bosses.map((u) => ({ value: u.id, label: u.name }))]}
+        />
+        {o.summonBossId && (
+          <div className="grid2">
+            <SelectField<'found' | 'completed'>
+              label="When"
+              value={o.summonWhen ?? 'found'}
+              onChange={(summonWhen) => onChange({ ...o, summonWhen })}
+              options={[
+                { value: 'found', label: 'When this objective is found' },
+                { value: 'completed', label: 'When it is completed' },
+              ]}
+            />
+            <SelectField<'objective' | 'random'>
+              label="Where"
+              value={o.summonAt ?? 'objective'}
+              onChange={(summonAt) => onChange({ ...o, summonAt })}
+              options={[
+                { value: 'objective', label: 'At this objective' },
+                { value: 'random', label: 'On a random tile in play' },
+              ]}
+            />
+          </div>
+        )}
+        <SelectField
+          label="Completed when this boss is defeated"
+          help="defeatBoss"
+          value={o.defeatBossId ?? ''}
+          onChange={(defeatBossId) => onChange({ ...o, defeatBossId })}
+          options={[{ value: '', label: '— not linked to a boss —' }, ...bosses.map((u) => ({ value: u.id, label: u.name }))]}
+        />
+        {bosses.length === 0 && <small className="muted">Mark a unit as Boss under Units to use these.</small>}
+      </fieldset>
       <TextArea label="Notes" value={o.description} onChange={(description) => onChange({ ...o, description })} />
     </div>
   );
@@ -203,6 +272,7 @@ export function ObjectivesPage() {
             {o.questline && <i className="faction">{o.questline}</i>}
             <span>On: {placementLabel(o)}</span>
             {o.isStart === false && o.revealedBy && <span>🔒 after “{objectiveNames.get(o.revealedBy) ?? '?'}”</span>}
+            {o.summonBossId && <span>♛ summons a boss</span>}
           </small>
         </div>
       )}
@@ -266,10 +336,10 @@ export function MissionsPage() {
 // ---- Map tiles --------------------------------------------------------------
 
 function MapTileEditor({ value: t, onChange }: EditorProps<MapTile>) {
-  const markerTypes = useMarkerTypes();
+  const markerTypes = useMarkerNames();
   const collections = collectionsOf(useCollection(repos.mapTiles));
   const setMarker = (i: number, patch: Partial<MapTile['markers'][number]>) =>
-    onChange({ ...t, markers: t.markers.map((m, j) => (j === i ? { ...m, ...patch } : m)) });
+    onChange({ ...t, markers: t.markers.map((m, j) => (j === i ? { label: patch.label ?? markerName(m) } : m)) });
   return (
     <div className="form">
       <div className="grid2">
@@ -285,12 +355,11 @@ function MapTileEditor({ value: t, onChange }: EditorProps<MapTile>) {
         </legend>
         {t.markers.map((m, i) => (
           <div key={i} className="row gap marker-row">
-            <TextField label="Label" value={m.label} onChange={(label) => setMarker(i, { label })} />
-            <TextField label="Type" suggestions={markerTypes} value={m.type} onChange={(type) => setMarker(i, { type })} />
+            <TextField label="Marker" suggestions={markerTypes} value={markerName(m)} onChange={(label) => setMarker(i, { label })} placeholder="e.g. Altar" />
             <button className="ghost" title="Remove marker" onClick={() => onChange({ ...t, markers: t.markers.filter((_, j) => j !== i) })}>×</button>
           </div>
         ))}
-        <button onClick={() => onChange({ ...t, markers: [...t.markers, { label: String.fromCharCode(65 + t.markers.length), type: '' }] })}>+ Add marker</button>
+        <button onClick={() => onChange({ ...t, markers: [...t.markers, { label: '' }] })}>+ Add marker</button>
       </fieldset>
       <TextArea label="Extra rules (optional)" help="tileRules" rows={4} value={t.rules ?? ''} onChange={(rules) => onChange({ ...t, rules })} placeholder="e.g. Difficult terrain: models moving through the water halve their movement." />
       <TextArea label="Notes" value={t.description} onChange={(description) => onChange({ ...t, description })} />
@@ -316,7 +385,7 @@ export function MapTilesPage() {
             <br />
             <small className="muted unit-meta">
               {t.collection && <i className="faction">{t.collection}</i>}
-              <span>{t.markers.map((m) => `${m.label}: ${m.type}`).join(', ') || 'No markers'}</span>
+              <span>{t.markers.map(markerName).filter(Boolean).join(', ') || 'No markers'}</span>
             </small>
           </div>
         </div>

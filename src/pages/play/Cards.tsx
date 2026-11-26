@@ -1,10 +1,10 @@
-import { forwardRef } from 'react';
+import { forwardRef, type ReactNode } from 'react';
 import { TileThumb } from '../../components/Thumbs';
 import type { GameCatalog, GameEvent } from '../../game/engine';
 import { describe } from './describe';
 
 /** Events that come from drawing a card off one of the piles. */
-export const isDrawnCard = (e: GameEvent) => ['hero', 'activate', 'spawn', 'tile', 'tileDeckEmpty'].includes(e.kind);
+export const isDrawnCard = (e: GameEvent) => ['hero', 'activate', 'spawn', 'tile', 'tileDeckEmpty', 'bossActivation'].includes(e.kind);
 
 const TYPE_LABEL: Record<GameEvent['kind'], string> = {
   start: 'Setup',
@@ -16,10 +16,13 @@ const TYPE_LABEL: Record<GameEvent['kind'], string> = {
   tileDeckEmpty: 'Explore',
   enemiesChanged: 'Enemies',
   objective: 'Objective',
+  bossAppears: 'Boss',
+  bossActivation: 'Boss',
+  bossDefeated: 'Boss',
 };
 
 /** Back of a card; `kind` picks the activation or the map tile design. */
-export function CardBack({ kind }: { kind: 'activation' | 'tiles' }) {
+export function CardBack({ kind }: { kind: 'activation' | 'tiles' | 'boss' }) {
   return (
     <div className={`card-back ${kind}`}>
       <div className="card-back-inner">
@@ -30,7 +33,7 @@ export function CardBack({ kind }: { kind: 'activation' | 'tiles' }) {
 }
 
 /** A face-up card for one game event. `glow`: just drawn, so it glows softly for a moment. */
-export function PlayCard({ event, cat, small, glow }: { event: GameEvent; cat: GameCatalog; small?: boolean; glow?: boolean }) {
+export function PlayCard({ event, cat, small, glow, action }: { event: GameEvent; cat: GameCatalog; small?: boolean; glow?: boolean; action?: ReactNode }) {
   const d = describe(event, cat);
   // One tile (explore, setup): a bigger picture. Several (activation, spawn): compact rows.
   const thumbSize = (d.tileRows?.length ?? 0) === 1 && (event.kind === 'tile' || event.kind === 'start') ? 'large' : 'medium';
@@ -54,6 +57,7 @@ export function PlayCard({ event, cat, small, glow }: { event: GameEvent; cat: G
         {d.lines.map((l, i) => (
           <p key={i}>{l}</p>
         ))}
+        {action && <div className="play-card-action">{action}</div>}
       </div>
     </article>
   );
@@ -62,16 +66,15 @@ export function PlayCard({ event, cat, small, glow }: { event: GameEvent; cat: G
 /** A pile of face-down cards. Thicker the more cards are left; click to draw. */
 export const CardPile = forwardRef<
   HTMLDivElement,
-  { kind: 'activation' | 'tiles'; label: string; count: number; note: string; disabled?: boolean; onDraw(): void }
+  { kind: 'activation' | 'tiles' | 'boss'; label: string; count: number; note: string; disabled?: boolean; onDraw?(): void }
 >(function CardPile({ kind, label, count, note, disabled, onDraw }, topRef) {
   const layers = Math.min(Math.max(count, 1), 6) - 1;
+  // A pile without onDraw (a boss deck) is drawn by the game itself, so it's not a button.
+  const Tag = onDraw ? 'button' : 'div';
   return (
-    <button
-      type="button"
-      className={`pile ${kind} ${disabled ? 'empty' : ''}`}
-      onClick={onDraw}
-      disabled={disabled}
-      aria-label={`${label}: draw a card (${note})`}
+    <Tag
+      {...(onDraw ? { type: 'button' as const, onClick: onDraw, disabled, 'aria-label': `${label}: draw a card (${note})` } : { 'aria-label': `${label} (${note})` })}
+      className={`pile ${kind} ${disabled ? 'empty' : ''} ${onDraw ? '' : 'auto'}`}
     >
       <div className="pile-stack">
         {Array.from({ length: layers }, (_, i) => (
@@ -85,7 +88,7 @@ export const CardPile = forwardRef<
       </div>
       <span className="pile-label">{label}</span>
       <span className="pile-note">{note}</span>
-    </button>
+    </Tag>
   );
 });
 

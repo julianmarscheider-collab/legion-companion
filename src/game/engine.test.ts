@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MapTile, Unit } from '../domain/types';
-import { changeEnemies, createGame, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, toggleObjective, enemyCardCount, drawActivation, exploreTile, type GameCatalog, type GameConfig } from './engine';
+import { canRedrawTile, changeEnemies, createGame, redrawTile, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, toggleObjective, enemyCardCount, drawActivation, exploreTile, type GameCatalog, type GameConfig } from './engine';
 
 const meta = { ownerId: 'o', createdAt: 0, updatedAt: 0 };
 const unit = (id: string, over: Partial<Unit> = {}): Unit => ({
@@ -10,7 +10,7 @@ const unit = (id: string, over: Partial<Unit> = {}): Unit => ({
 });
 const tile = (id: string, markers: MapTile['markers'] = []): MapTile => ({ ...meta, id, name: id, code: id, description: '', photos: [], markers });
 
-const tiles = [tile('t1'), tile('t2', [{ label: 'A', type: 'Altar' }]), tile('t3'), tile('t4'), tile('t5')];
+const tiles = [tile('t1'), tile('t2', [{ label: 'Altar' }]), tile('t3'), tile('t4'), tile('t5')];
 const cat: GameCatalog = {
   mission: { ...meta, id: 'm', name: 'M', description: '', objectiveIds: ['o1'] },
   objectives: [{ ...meta, id: 'o1', name: 'Light the altar', description: '', markerType: 'altar', setup: '', completion: '' }],
@@ -27,7 +27,7 @@ describe('engine', () => {
     const g = createGame(config, cat, 42);
     expect(g.tilesInPlay).toEqual(['t1']);
     expect(g.tileDeck.sort()).toEqual(['t2', 't3', 't4', 't5']);
-    expect(g.placements).toEqual([{ objectiveId: 'o1', tileId: 't2', markerLabel: 'A' }]);
+    expect(g.placements).toEqual([{ objectiveId: 'o1', tileId: 't2', markerLabel: 'Altar' }]);
     expect(g.activationDeck).toHaveLength(2 + 2 + 1);
     expect(g.activationDeck.filter((c) => c.kind === 'hero')).toHaveLength(2);
   });
@@ -131,7 +131,7 @@ describe('engine', () => {
   });
 
   it('reveals chained objectives when the objective revealing them is completed', () => {
-    const tiles2 = [tile('s'), tile('a', [{ label: 'A', type: 'Key' }]), tile('b', [{ label: 'B', type: 'Cell' }])];
+    const tiles2 = [tile('s'), tile('a', [{ label: 'Key' }]), tile('b', [{ label: 'Cell' }])];
     const c: GameCatalog = {
       ...cat,
       tiles: tiles2,
@@ -146,7 +146,7 @@ describe('engine', () => {
     g = { ...g, tileDeck: ['b', 'a'] }; // explore the cell tile first
     g = exploreTile(g, c);
     // The cell is found before the key: announced as locked, not yet usable.
-    expect(g.log[g.log.length - 1]).toEqual([{ kind: 'tile', tileId: 'b', placements: [], locked: [{ objectiveId: 'cell', tileId: 'b', markerLabel: 'B' }] }]);
+    expect(g.log[g.log.length - 1]).toEqual([{ kind: 'tile', tileId: 'b', placements: [], locked: [{ objectiveId: 'cell', tileId: 'b', markerLabel: 'Cell' }] }]);
     expect(lockedObjectives(g, c).has('cell')).toBe(true);
     g = exploreTile(g, c); // key found, but cell still hidden until the key objective is completed
     const onTile = (g.log[g.log.length - 1][0] as { placements: { objectiveId: string }[] }).placements.map((p) => p.objectiveId);
@@ -173,6 +173,122 @@ describe('engine', () => {
       }
       expect(g.inPlay).toEqual({ rat: 6, boss: 1 });
     }
+  });
+
+  it('redraws an illegal tile: back into the deck (not on top) and a new tile drawn', () => {
+    for (let seed = 0; seed < 30; seed++) {
+      let g = createGame(config, cat, seed);
+      g = exploreTile(g, cat);
+      const first = g.tilesInPlay[1];
+      expect(canRedrawTile(g)).toBe(true);
+      g = redrawTile(g, cat);
+      const second = g.tilesInPlay[1];
+      expect(second).not.toBe(first);
+      expect(g.tilesInPlay).toHaveLength(2);
+      expect(g.tileDeck).toContain(first);
+      if (g.tileDeck.length > 1) expect(g.tileDeck[0]).not.toBe(first); // not straight back on top
+      expect(g.log[g.log.length - 1][0]).toMatchObject({ kind: 'tile', tileId: second, replaced: first });
+    }
+    // nothing to swap with when the deck is empty, and only right after exploring
+    let g = createGame(config, cat, 1);
+    while (g.tileDeck.length) g = exploreTile(g, cat);
+    expect(canRedrawTile(g)).toBe(false);
+    g = drawActivation(createGame(config, cat, 2), config, cat);
+    expect(canRedrawTile(g)).toBe(false);
+  });
+
+  it('places objectives on markers by name, also for old markers with a separate type', () => {
+    const t = [tile('s'), tile('x', [{ label: 'A', type: 'Shrine' }]), tile('y', [{ label: 'Shrine' }, { label: 'Shrine' }])];
+    const c: GameCatalog = {
+      ...cat,
+      tiles: t,
+      mapSet: { ...cat.mapSet, tileIds: ['s', 'x', 'y'], startTileId: 's' },
+      mission: { ...cat.mission, objectiveIds: ['a', 'b', 'c'] },
+      objectives: ['a', 'b', 'c'].map((id) => ({ ...meta, id, name: id, description: '', markerType: 'shrine', setup: '', completion: '' })),
+    };
+    for (let seed = 0; seed < 20; seed++) {
+      const g = createGame(config, c, seed);
+      // three Shrine markers in total (one old-style, two on the same tile): each used once
+      expect(g.placements.map((p) => p.markerLabel)).toEqual(['Shrine', 'Shrine', 'Shrine']);
+      expect(g.placements.filter((p) => p.tileId === 'y')).toHaveLength(2);
+    }
+  });
+
+  describe('bosses', () => {
+    const boss = unit('warlord', {
+      isBoss: true, count: 1, bossActivations: 1,
+      bossDeck: [{ abilityId: 'slam', copies: 2 }, { abilityId: 'roar', copies: 1 }],
+    });
+    const ab = (id: string) => ({ ...meta, id, name: id, description: `${id} text`, points: 0, bossCard: true });
+    const t = [tile('s'), tile('a', [{ label: 'Altar' }]), tile('b'), tile('c'), tile('d')];
+    const c: GameCatalog = {
+      ...cat,
+      units: [...cat.units, boss], // a boss in the enemy list must still never spawn normally
+      bosses: [boss],
+      abilities: [ab('slam'), ab('roar')],
+      tiles: t,
+      mapSet: { ...cat.mapSet, tileIds: t.map((x) => x.id), startTileId: 's' },
+      mission: { ...cat.mission, objectiveIds: ['altar', 'slay'] },
+      objectives: [
+        { ...meta, id: 'altar', name: 'Altar', description: '', markerType: 'Altar', setup: '', completion: '', summonBossId: 'warlord', summonWhen: 'completed', summonAt: 'objective' },
+        { ...meta, id: 'slay', name: 'Slay', description: '', placement: 'none', markerType: '', setup: '', completion: '', isStart: false, revealedBy: 'altar', defeatBossId: 'warlord' },
+      ],
+    };
+    const prep = (seed: number) => {
+      let g = createGame(config, c, seed);
+      g = { ...g, tileDeck: ['a', 'b', 'c', 'd'] };
+      for (let i = 0; i < 4; i++) g = exploreTile(g, c);
+      return g;
+    };
+
+    it('appears when the objective is completed, at the objective, with its cards in the deck', () => {
+      let g = prep(1);
+      expect(g.inPlay.warlord ?? 0).toBe(0);
+      g = toggleObjective(g, c, 'altar');
+      const e = g.log[g.log.length - 1];
+      expect(e.find((x) => x.kind === 'bossAppears')).toMatchObject({ bossId: 'warlord', tileId: 'a', markerLabel: 'Altar' });
+      // the "not on the map" objective it unlocks is revealed right away
+      expect(e[0]).toMatchObject({ kind: 'objective', revealed: [{ objectiveId: 'slay', tileId: '' }] });
+      expect(g.inPlay.warlord).toBe(1);
+      expect(g.bosses?.warlord.drawPile.sort()).toEqual(['roar', 'slam', 'slam']);
+      // completing again (after reopening) doesn't summon a second time
+      g = toggleObjective(toggleObjective(g, c, 'altar'), c, 'altar');
+      expect(g.log[g.log.length - 1].some((x) => x.kind === 'bossAppears')).toBe(false);
+    });
+
+    it('draws boss cards on boss activation, reshuffles, and never puts activations back to back', () => {
+      for (let seed = 0; seed < 25; seed++) {
+        let g = toggleObjective(prep(seed), c, 'altar');
+        let prev = g.lastCard;
+        const drawnCards: string[] = [];
+        for (let i = 0; i < 40; i++) {
+          g = drawActivation(g, config, c);
+          const e = g.log[g.log.length - 1].find((x) => x.kind !== 'round')!;
+          const isAct = e.kind === 'bossActivation' || (e.kind === 'activate' && !e.replacedSpawn);
+          expect(isAct && (prev === 'enemy' || prev === 'boss')).toBe(false);
+          prev = e.kind === 'bossActivation' ? 'boss' : g.lastCard;
+          if (e.kind === 'bossActivation') drawnCards.push(e.cardId);
+          for (const x of g.log[g.log.length - 1]) if (x.kind === 'spawn') expect(x.spawns.some((sp) => sp.unitId === 'warlord')).toBe(false);
+        }
+        expect(drawnCards.length).toBeGreaterThan(3); // at least one boss card per round
+        expect(new Set(drawnCards)).toEqual(new Set(['slam', 'roar']));
+      }
+    });
+
+    it('is defeated by removing it: cards leave the deck and the linked objective is completed', () => {
+      let g = toggleObjective(prep(3), c, 'altar');
+      g = changeEnemies(g, c, 'warlord', +1); // can't be added by hand
+      expect(g.inPlay.warlord).toBe(1);
+      g = changeEnemies(g, c, 'warlord', -1);
+      expect(g.log[g.log.length - 1][0]).toMatchObject({ kind: 'bossDefeated', bossId: 'warlord', completed: ['slay'] });
+      expect(g.completedObjectives).toContain('slay');
+      expect(g.bosses?.warlord).toBeUndefined();
+      expect(g.activationDeck.some((x) => x.kind === 'boss')).toBe(false);
+      for (let i = 0; i < 12; i++) {
+        g = drawActivation(g, config, c);
+        expect(g.log[g.log.length - 1].some((x) => x.kind === 'bossActivation')).toBe(false);
+      }
+    });
   });
 
   it('starts a new round when the activation deck runs out', () => {

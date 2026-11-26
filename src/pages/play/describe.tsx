@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import type { GameCatalog, GameEvent, Placement } from '../../game/engine';
+import { UnitCard } from '../../components/UnitCard';
+import { findUnit, type GameCatalog, type GameEvent, type Placement } from '../../game/engine';
 
 export interface TileRow {
   tileId: string;
@@ -22,6 +23,7 @@ export function describe(e: GameEvent, cat: GameCatalog): Described {
     const t = cat.tiles.find((x) => x.id === id);
     return t ? `Tile ${t.code} (${t.name})` : 'Unknown tile';
   };
+  const unitName = (id: string) => findUnit(cat, id)?.name ?? 'Unknown unit';
   // A tile's extra rules, shown as a highlighted box under the placement instruction.
   const tileRules = (id: string): ReactNode[] => {
     const rules = cat.tiles.find((x) => x.id === id)?.rules?.trim();
@@ -33,14 +35,19 @@ export function describe(e: GameEvent, cat: GameCatalog): Described {
         ]
       : [];
   };
-  const unit = (id: string) => cat.units.find((u) => u.id === id)?.name ?? 'Unknown unit';
+  const unit = unitName;
   // Flavour text (italic) first, then the setup instruction.
   const placement = (p: Placement, currentTile?: string): ReactNode[] => {
     const o = cat.objectives.find((x) => x.id === p.objectiveId);
+    if (!p.tileId) {
+      // Not on the map (e.g. "Slay the Warlord"): no placement, just the instruction.
+      const text = `Objective “${o?.name}”: ${o?.setup || o?.completion || 'see the objective card.'}`;
+      return o?.flavour?.trim() ? [<em key={`${p.objectiveId}-flavour`} className="flavour">{o.flavour.trim()}</em>, text] : [text];
+    }
     const onTile = p.tileId !== currentTile ? ` on ${tile(p.tileId)}` : '';
     // Without a marker the objective goes on the tile's printed objective location.
     const where = p.markerLabel
-      ? onTile + (onTile ? `, marker ${p.markerLabel}` : ` on marker ${p.markerLabel}`)
+      ? onTile + (onTile ? `, at the ${p.markerLabel} marker` : ` on the ${p.markerLabel} marker`)
       : onTile
         ? ` on the objective location of ${tile(p.tileId)}`
         : ' on the objective location of this tile';
@@ -55,7 +62,7 @@ export function describe(e: GameEvent, cat: GameCatalog): Described {
     const o = cat.objectives.find((x) => x.id === p.objectiveId);
     const pre = cat.objectives.find((x) => x.id === o?.revealedBy);
     const onTile = p.tileId !== currentTile ? ` on ${tile(p.tileId)}` : '';
-    const where = p.markerLabel ? onTile + (onTile ? `, marker ${p.markerLabel}` : ` on marker ${p.markerLabel}`) : onTile;
+    const where = p.markerLabel ? onTile + (onTile ? `, at the ${p.markerLabel} marker` : ` on the ${p.markerLabel} marker`) : onTile;
     const text = o?.lockedText?.trim() || 'It can’t be completed yet.';
     return [
       ...(o?.lockedFlavour?.trim() ? [<em key={`${p.objectiveId}-lflavour`} className="flavour">{o.lockedFlavour.trim()}</em>] : []),
@@ -112,6 +119,7 @@ export function describe(e: GameEvent, cat: GameCatalog): Described {
       return {
         title: 'Explore',
         tone: 'info',
+        notes: e.replaced ? [<em key="replaced">{tile(e.replaced)} couldn’t be placed and was shuffled back into the tile deck.</em>] : [],
         tileRows: [{ tileId: e.tileId, text: `Place ${tile(e.tileId)} where the heroes left the board.` }],
         lines: [
           ...tileRules(e.tileId),
@@ -127,6 +135,50 @@ export function describe(e: GameEvent, cat: GameCatalog): Described {
         tone: 'muted',
         lines: [`${Math.abs(e.delta)} × ${unit(e.unitId)} ${e.delta < 0 ? 'removed from' : 'added to'} the board.`],
       };
+    case 'bossAppears': {
+      const boss = findUnit(cat, e.bossId);
+      const where = e.markerLabel ? `, at the ${e.markerLabel} marker` : '';
+      return {
+        title: 'Boss appears!',
+        tone: 'boss',
+        tileRows: [{ tileId: e.tileId, text: `Place ${boss?.name ?? 'the boss'} on ${tile(e.tileId)}${where}.` }],
+        lines: [
+          <span key="cards" className="muted">Its activation cards are shuffled into the activation deck.</span>,
+          ...(boss ? [<UnitCard key="card" unit={boss} abilities={cat.abilities} />] : []),
+        ],
+      };
+    }
+    case 'bossActivation': {
+      const card = cat.abilities.find((a) => a.id === e.cardId);
+      return {
+        title: `Boss activation: ${unitName(e.bossId)}`,
+        tone: 'boss',
+        notes: e.reshuffled ? [<em key="reshuffled">The boss deck has been reshuffled.</em>] : [],
+        lines: [
+          card ? (
+            <span key="action" className="boss-action">
+              <strong>{card.name}</strong>
+              {card.description && <span>{card.description}</span>}
+            </span>
+          ) : (
+            'The boss has no boss cards: it activates like a normal enemy.'
+          ),
+        ],
+      };
+    }
+    case 'bossDefeated': {
+      const revealed = e.revealed ?? [];
+      return {
+        title: 'Boss defeated!',
+        tone: 'hero',
+        lines: [
+          `${unitName(e.bossId)} has been slain. Its activation cards leave the activation deck.`,
+          ...e.completed.map((id) => <strong key={id}>Objective complete: {cat.objectives.find((o) => o.id === id)?.name}</strong>),
+          ...(revealed.length ? [<strong key="new">{revealed.length === 1 ? 'Objective unlocked!' : 'Objectives unlocked!'}</strong>] : []),
+          ...revealed.flatMap((p) => placement(p)),
+        ],
+      };
+    }
     case 'objective': {
       const o = cat.objectives.find((x) => x.id === e.objectiveId);
       const revealed = e.revealed ?? [];

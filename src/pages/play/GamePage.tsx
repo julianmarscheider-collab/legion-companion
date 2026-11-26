@@ -7,9 +7,10 @@ import { TileThumb, UnitThumb } from '../../components/Thumbs';
 import { UnitCard } from '../../components/UnitCard';
 import { repos } from '../../data/repositories';
 import type { SavedGame } from '../../data/savedGame';
-import { changeEnemies, drawActivation, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, exploreTile, toggleObjective, type GameSnapshot } from '../../game/engine';
+import { bossesOf, canRedrawTile, changeEnemies, drawActivation, findUnit, redrawTile, enemiesOnBoard, foundObjectives, isObjectiveUnlocked, lockedObjectives, exploreTile, toggleObjective, type GameSnapshot } from '../../game/engine';
 import { CardPile, isDrawnCard, PlayCard, QuestCard, type QuestState } from './Cards';
 import { describe, describedText } from './describe';
+import { markerName } from '../../domain/markers';
 
 const MAX_HISTORY = 200;
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -65,6 +66,8 @@ export function GamePage() {
     const t = cat.tiles.find((x) => x.id === tid);
     return t ? `Tile ${t.code} – ${t.name}` : '?';
   };
+  // Enemies panel: bosses first, then the enemy list's units.
+  const boardUnits = [...bossesOf(cat), ...cat.units.filter((u) => !u.isBoss)];
   const objectiveName = (id?: string) => cat.objectives.find((x) => x.id === id)?.name ?? '';
   // Objectives the players know about, as quest cards: found, locked, or known but not found yet.
   const questCards = s.placements
@@ -82,7 +85,7 @@ export function GamePage() {
         id: p.objectiveId,
         name: o?.name ?? '',
         state,
-        where: `${tileName(p.tileId)}${p.markerLabel ? `, marker ${p.markerLabel}` : ''}`,
+        where: p.tileId ? `${tileName(p.tileId)}${p.markerLabel ? `, ${p.markerLabel} marker` : ''}` : 'Not on the map',
         requires: objectiveName(o?.revealedBy),
         flavour: (state === 'locked' ? o?.lockedFlavour : state === 'unfound' ? '' : o?.flavour)?.trim(),
         text:
@@ -139,6 +142,17 @@ export function GamePage() {
                   cat={cat}
                   small={!drawn && current.some(isDrawnCard)}
                   glow={drawn && glowAt === s.log.length}
+                  action={
+                    e.kind === 'tile' && canRedrawTile(s) ? (
+                      <span className="redraw">
+                        <button className="small" onClick={() => draw(() => redrawTile(s, cat))}>
+                          ↻ Redraw tile
+                        </button>
+                        <span className="muted small">if it can’t be placed</span>
+                        <HelpTip rule="redrawTile" />
+                      </span>
+                    ) : undefined
+                  }
                 />
               );
             })}
@@ -162,6 +176,16 @@ export function GamePage() {
               disabled={s.tileDeck.length === 0}
               onDraw={() => draw(() => exploreTile(s, cat))}
             />
+            {/* One boss deck per boss on the board; drawn automatically when the boss activates. */}
+            {Object.entries(s.bosses ?? {}).map(([bossId, b]) => (
+              <CardPile
+                key={bossId}
+                kind="boss"
+                label={findUnit(cat, bossId)?.name ?? 'Boss'}
+                count={b.drawPile.length}
+                note={b.drawPile.length ? `${plural(b.drawPile.length, 'boss card')} left` : 'Reshuffles on next activation'}
+              />
+            ))}
           </div>
           <div className="table-controls">
             <button className="ghost undo" onClick={undo} disabled={game.history.length === 0}>
@@ -173,10 +197,32 @@ export function GamePage() {
           <section className="side-panel">
             <h3>Enemies on the board</h3>
                 <ul className="list">
-                  {cat.units
+                  {boardUnits
                     .filter((u) => (s.inPlay[u.id] ?? 0) > 0)
                     .map((u) => {
                       const n = s.inPlay[u.id];
+                      if (u.isBoss)
+                        return (
+                          <li key={u.id} className="card enemy-row boss-row">
+                            <div className="row between">
+                              <UnitThumb unit={u} />
+                              <button className="ghost grow left" onClick={() => setOpenUnit(openUnit === u.id ? null : u.id)}>
+                                <span className="enemy-name">
+                                  <span className="crown" aria-hidden="true">♛</span>
+                                  <strong>{u.name}</strong>
+                                  <span className="badge boss-badge">Boss</span>
+                                </span>
+                                <small className="muted">
+                                  {plural(s.bosses?.[u.id]?.drawPile.length ?? 0, 'boss card')} left · tap for card
+                                </small>
+                              </button>
+                              <button className="small" title="The boss is slain" onClick={() => apply(changeEnemies(s, cat, u.id, -1))}>
+                                Defeated
+                              </button>
+                            </div>
+                            {openUnit === u.id && <UnitCard unit={u} abilities={cat.abilities} />}
+                          </li>
+                        );
                       return (
                         <li key={u.id} className="card enemy-row">
                           <div className="row between">
@@ -206,7 +252,7 @@ export function GamePage() {
                   placeholder="+ Add enemy by hand…"
                   ariaLabel="Add enemy by hand"
                   options={cat.units
-                    .filter((u) => (s.inPlay[u.id] ?? 0) < u.count)
+                    .filter((u) => !u.isBoss && (s.inPlay[u.id] ?? 0) < u.count)
                     .map((u) => ({ value: u.id, label: `${u.name} (${u.count - (s.inPlay[u.id] ?? 0)} free)` }))}
                   onChange={(unitId) => apply(changeEnemies(s, cat, unitId, 1))}
                 />
@@ -260,7 +306,7 @@ export function GamePage() {
                   <div className="grow">
                     <strong>{tileName(tid)}</strong>
                     {t?.markers.length ? (
-                      <small className="muted"> · markers {t.markers.map((m) => `${m.label} (${m.type})`).join(', ')}</small>
+                      <small className="muted"> · markers {t.markers.map(markerName).join(', ')}</small>
                     ) : null}
                   </div>
                   {rules && (

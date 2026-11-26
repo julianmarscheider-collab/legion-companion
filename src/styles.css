@@ -436,3 +436,24 @@ p.tile-rules { margin: 0.5rem 0 0; }
 .quest-details p { margin: 0.25rem 0; }
 .quest-check { display: flex; align-items: center; gap: 0.45rem; padding: 0.15rem 0.65rem 0.5rem; margin-top: auto; cursor: pointer; font-size: 0.95rem; }
 .quest-check input { width: 20px; height: 20px; accent-color: var(--gold); }
+/* Reserve room for the drawn card so the piles don't jump on every draw. */
+.card-stage { min-height: 340px; justify-content: flex-start; }
+@media (max-width: 600px) { .card-stage { min-height: 360px; } }
+.play-card-action { margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dashed #4a3d2e; }
+.redraw { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+/* ---- Bosses ---- */
+:root { --boss: #8a4fb8; }
+.play-card.tone-boss .play-card-band { background: var(--boss); color: #f3eafb; }
+.play-card.tone-boss { background: linear-gradient(180deg, #2c2233 0%, #221b27 100%); border-color: #6b4c86; }
+.boss-action { display: flex; flex-direction: column; gap: 0.25rem; border: 1px solid #6b4c86; border-radius: 10px; padding: 0.6rem 0.8rem; background: #2a2032; }
+.boss-action strong { font-family: var(--font-heading); color: #d7b8f0; font-size: 1.15rem; }
+.badge.boss-badge { background: var(--boss); }
+.crown { color: #d7b8f0; font-size: 1.1rem; }
+.boss-row { border-color: #6b4c86; background: linear-gradient(180deg, #2c2233, #241d2a); }
+.card-back.boss { border-color: #6b4c86; }
+.card-back.boss .card-back-inner { border-color: #b88fd988; background: repeating-linear-gradient(-45deg, #3a2747 0 7px, #2b1d36 7px 14px); }
+.pile.auto { cursor: default; }
+.pile.auto .pile-label { color: #d7b8f0; }
+.boss-deck .copies { min-width: 2.2em; text-align: center; font-weight: 700; color: var(--gold); }
+.boss-deck .grid2 { margin-top: 0.3rem; }
