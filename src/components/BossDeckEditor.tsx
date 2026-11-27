@@ -1,4 +1,5 @@
 import type { Ability, BossDeckEntry } from '../domain/types';
+import { CardPreview } from './CardPreview';
 import { Dropdown } from './Dropdown';
 import { LabelText } from './HelpTip';
 import { MinusIcon, PlusIcon } from './Icons';
@@ -25,7 +26,9 @@ export function BossDeckEditor({ deck, cards, onChange }: { deck: BossDeckEntry[
           return (
             <li key={e.abilityId}>
               <span className="grow">
-                {c.name}
+                <CardPreview title={c.name} text={c.description}>
+                  {c.name}
+                </CardPreview>
                 {c.collection && <span className="muted"> · {c.collection}</span>}
               </span>
               <button className="round-btn" aria-label={`One copy less of ${c.name}`} onClick={() => setCopies(e.abilityId, e.copies - 1)}>

@@ -470,3 +470,15 @@ p.tile-rules { margin: 0.5rem 0 0; }
 .stat-dep .field > .label-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .difficulty-custom { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.4rem; padding: 0.7rem; border: 1px solid var(--border); border-radius: 10px; background: #201b15; }
 .save-preset input { min-width: 0; }
+
+/* Boss card preview on mouse-over */
+.card-preview-anchor { position: relative; cursor: help; text-decoration: underline dotted #b88fd9; text-underline-offset: 3px; outline: none; }
+.card-preview-anchor:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 3px; }
+.card-preview {
+  position: absolute; z-index: 60; left: 0; top: calc(100% + 6px); width: min(300px, 75vw);
+  display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; cursor: default;
+  border: 2px solid #6b4c86; background: linear-gradient(180deg, #2c2233, #221b27); box-shadow: 0 10px 26px #000c;
+  font-weight: normal; text-decoration: none;
+}
+.card-preview-band { font-family: var(--font-heading); font-weight: 700; font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; padding: 0.2rem 0.7rem; background: var(--boss); color: #f3eafb; }
+.card-preview .boss-action { margin: 0.6rem; }

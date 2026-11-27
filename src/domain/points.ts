@@ -88,7 +88,7 @@ export function unitPoints(u: Unit, abilities: Ability[]): number {
 /** Short cost label, e.g. "+4 pts" or "×1.25". */
 export function abilityCostLabel(a: Ability): string {
   if (isMultiplier(a)) return `×${a.multiplier ?? 1}`;
-  if (a.costType === 'dependent') return dependentFormula(a);
+  if (a.costType === 'dependent') return 'variable'; // depends on the unit's stats
   return `${a.points >= 0 ? '+' : ''}${a.points} pts`;
 }
 

@@ -81,7 +81,10 @@ export function CrudPage<T extends Named>(p: {
             onChange={(v) => setGroupSel((sel) => Object.assign([...sel], { [k]: v }))}
           />
         ))}
-        {items.length > 5 && <input className="search" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />}
+        {/* Search only helps once a list gets longer. */}
+        {items.length >= 5 && (
+          <input className="search" type="search" aria-label={`Search ${p.title.toLowerCase()}`} placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        )}
         <ul className="list">
           {filtered.map((item) => (
             <li key={item.id}>
@@ -146,7 +149,7 @@ function GroupChips<T>(p: {
   return (
     <div className="chips" role="group" aria-label={`Filter by ${p.groups.label}`}>
       <button className={p.value === null ? 'chip active' : 'chip'} onClick={() => p.onChange(null)}>
-        All <span className="muted">{p.items.length}</span>
+        All {p.groups.label}s <span className="muted">{p.items.length}</span>
       </button>
       {names.map((g) => (
         <button key={g} className={p.value === g ? 'chip active' : 'chip'} onClick={() => p.onChange(p.value === g ? null : g)}>
