@@ -20,6 +20,8 @@ export function CrudPage<T extends Named>(p: {
   summary(item: T): ReactNode;
   Editor(props: EditorProps<T>): ReactNode;
   newLabel?: string;
+  /** Extra buttons next to "+ New", e.g. an import. */
+  actions?: ReactNode;
   /** Optional filter buttons, e.g. by faction; several rows allowed. Items with an empty group fall under `emptyLabel`. */
   groups?: GroupDef<T> | GroupDef<T>[];
 }) {
@@ -66,9 +68,12 @@ export function CrudPage<T extends Named>(p: {
       <section className="crud-list">
         <header className="row between">
           <h1>{p.title}</h1>
-          <button className="primary" onClick={() => select(p.create(user!.id))}>
-            {p.newLabel ?? '+ New'}
-          </button>
+          <div className="row gap">
+            {p.actions}
+            <button className="primary" onClick={() => select(p.create(user!.id))}>
+              {p.newLabel ?? '+ New'}
+            </button>
+          </div>
         </header>
         <p className="muted">{p.intro}</p>
         {groupDefs.map((g, k) => (

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { CrudPage, type EditorProps } from '../../components/CrudPage';
 import { Checkbox, PickList, NumberField, SelectField, TextArea, TextField } from '../../components/fields';
 import { Dropdown } from '../../components/Dropdown';
@@ -7,6 +8,8 @@ import { LabelText } from '../../components/HelpTip';
 import { PhotoField } from '../../components/PhotoField';
 import { MiniCount } from '../../components/UnitCard';
 import { TileThumb } from '../../components/Thumbs';
+import { TileImportDialog } from '../../components/TileImportDialog';
+import { useAuth } from '../../auth/AuthContext';
 import { factionsOf } from './UnitsPage';
 import { newEntity, repos } from '../../data/repositories';
 import { useCollection } from '../../data/useCollection';
@@ -377,10 +380,15 @@ function MapTileEditor({ value: t, onChange }: EditorProps<MapTile>) {
 }
 
 export function MapTilesPage() {
+  const { user } = useAuth();
+  const tiles = useCollection(repos.mapTiles);
+  const [importing, setImporting] = useState(false);
   return (
+    <>
     <CrudPage
       title="Map tiles"
       intro="Your physical map tiles and the location markers printed on them."
+      actions={<button onClick={() => setImporting(true)}>Import images…</button>}
       groups={{ label: 'collection', get: (t) => t.collection ?? '', emptyLabel: 'No collection' }}
       repo={repos.mapTiles}
       create={(o) => ({ ...newEntity(o), name: '', code: '', collection: '', isStart: false, description: '', photos: [], markers: [], rules: '' })}
@@ -400,6 +408,8 @@ export function MapTilesPage() {
         </div>
       )}
     />
+    {importing && <TileImportDialog ownerId={user!.id} tiles={tiles} onClose={() => setImporting(false)} />}
+    </>
   );
 }
 

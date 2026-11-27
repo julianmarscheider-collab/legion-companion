@@ -66,3 +66,61 @@ export function CrownIcon() {
     </svg>
   );
 }
+
+/** Three square tiles fanned out like a hand of cards (map sets). The back two are covered by the front one. */
+export function TileFanIcon() {
+  const tile = (angle: number) => (
+    <rect
+      x="4.6" y="3.2" width="6.8" height="6.8" rx="0.6"
+      transform={`rotate(${angle} 8 16)`}
+      fill="var(--icon-fill, #1b1712)" stroke="currentColor" strokeWidth="1"
+    />
+  );
+  return (
+    <svg className="icon" viewBox="0 0 16 16" aria-hidden="true" strokeLinejoin="round">
+      {tile(-20)}
+      {tile(20)}
+      {/* The front tile sits a little higher, so the three read as separate cards. */}
+      <g transform="translate(0 -1.6)">{tile(0)}</g>
+    </svg>
+  );
+}
+
+/** Bone with knobbed ends, drawn as an outline: a coloured shape with a card-coloured inside. */
+function OutlineBone({ x1, y1, x2, y2 }: { x1: number; y1: number; x2: number; y2: number }) {
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  const [px, py] = [(-(y2 - y1) / len) * 1.2, ((x2 - x1) / len) * 1.2];
+  const knobs = [[x1, y1], [x2, y2]].flatMap(([x, y]) => [[x + px, y + py], [x - px, y - py]]);
+  const layer = (color: string, width: number, r: number) => (
+    <>
+      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={width} strokeLinecap="round" />
+      {knobs.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={r} fill={color} />)}
+    </>
+  );
+  return (
+    <>
+      {layer('currentColor', 3.8, 2.3)}
+      {layer('var(--icon-fill, #1b1712)', 1.8, 1.1)}
+    </>
+  );
+}
+
+/** Enemies: outlined skull (round top, slim jaw) over crossed bones, with open teeth. Different from the round difficulty skull. */
+export function EnemySkullIcon() {
+  return (
+    <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <OutlineBone x1={3.5} y1={3.5} x2={20.5} y2={20.5} />
+      <OutlineBone x1={20.5} y1={3.5} x2={3.5} y2={20.5} />
+      <g transform="translate(12 11.2) scale(0.95)">
+        <path
+          d="M0-7C-4.3-7 -6.80-4.2 -6.80-.6C-6.80 1.2 -5.80 2.3 -5.20 3L-3.60 3.9V6.6Q-3.60 7.5 -2.70 7.5H2.70Q3.60 7.5 3.60 6.6V3.9L5.20 3C5.80 2.3 6.80 1.2 6.80-.6C6.80-4.2 4.3-7 0-7z"
+          fill="var(--icon-fill, #1b1712)" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"
+        />
+        <circle cx="-2.6" cy="0.2" r="2" fill="currentColor" />
+        <circle cx="2.6" cy="0.2" r="2" fill="currentColor" />
+        <path d="M0 2.6l-1 1.8h2z" fill="currentColor" />
+        <path d="M-1.1 5.4V7.5M1.1 5.4V7.5" stroke="currentColor" strokeWidth="0.9" />
+      </g>
+    </svg>
+  );
+}

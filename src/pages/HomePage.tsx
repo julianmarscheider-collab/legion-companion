@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { EnemySkullIcon, TileFanIcon, TileIcon } from '../components/Icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { repos } from '../data/repositories';
 import { useCollection } from '../data/useCollection';
@@ -10,7 +11,7 @@ export interface NavItem {
   label: string;
   text: string;
   /** Small symbol on the home page card. */
-  icon: string;
+  icon: ReactNode;
 }
 
 /** Text presentation, so phones don't swap the symbols for colour emoji. */
@@ -25,7 +26,7 @@ export const NAV_GROUPS: { title: string; tone: 'gold' | 'blue'; items: NavItem[
     title: 'Enemy forces',
     tone: 'gold',
     items: [
-      { to: '/enemies', label: 'Enemies', icon: '☠' + T, text: 'Create enemy unit cards for your miniatures' },
+      { to: '/enemies', label: 'Enemies', icon: <EnemySkullIcon />, text: 'Create enemy unit cards for your miniatures' },
       { to: '/abilities', label: 'Abilities', icon: '✧' + T, text: 'Give your units special abilities' },
       { to: '/enemy-lists', label: 'Enemy lists', icon: '☰' + T, text: 'Combine your miniatures into lists to use in play' },
     ],
@@ -36,8 +37,8 @@ export const NAV_GROUPS: { title: string; tone: 'gold' | 'blue'; items: NavItem[
     items: [
       { to: '/objectives', label: 'Objectives', icon: '⚑' + T, text: 'Create objectives for your heroes to fulfill' },
       { to: '/missions', label: 'Missions', icon: '✠' + T, text: 'Combine objectives into missions' },
-      { to: '/tiles', label: 'Map tiles', icon: '⬡' + T, text: 'Add the tiles that make up the game board' },
-      { to: '/map-sets', label: 'Map sets', icon: '▦' + T, text: 'Combine your tiles into sets to use in play' },
+      { to: '/tiles', label: 'Map tiles', icon: <TileIcon />, text: 'Add the tiles that make up the game board' },
+      { to: '/map-sets', label: 'Map sets', icon: <TileFanIcon />, text: 'Combine your tiles into sets to use in play' },
     ],
   },
 ];
