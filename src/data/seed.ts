@@ -1,3 +1,4 @@
+import { isPlaceholderArt, PLACEHOLDER_ART } from './placeholderArt';
 import type { Ability, EnemyList, Entity, MapSet, MapTile, Mission, Objective, Unit } from '../domain/types';
 import { newEntity, repos, type Repository } from './repositories';
 
@@ -29,7 +30,7 @@ export function buildSampleData(ownerId: string): SampleData {
   const abilities = [ranged, poison, regen, leader, crush, warCry, horde, charge];
 
   const unit = (name: string, over: Partial<Unit>): Unit => ({
-    ...e(), name, faction: 'Goblins', description: '', photos: [], strength: 3, damage: 1, defense: 3, defenseType: 'None', speed: 2,
+    ...e(), name, faction: 'Goblins', description: '', photos: PLACEHOLDER_ART[name] ? [PLACEHOLDER_ART[name]] : [], strength: 3, damage: 1, defense: 3, defenseType: 'None', speed: 2,
     toughness: 1, abilityIds: [], count: 6,
     spawn: { priority: 5, groupedWith: [], minSpawn: 1 }, ...over,
   });
@@ -173,11 +174,12 @@ export async function restoreSampleData(ownerId: string): Promise<{ updated: num
 
   const id = (x: string) => idMap.get(x) ?? x;
   const ids = (xs: string[]) => xs.map(id);
-  // Keep the existing id and creation time, and the player's images if the example has none.
+  // Keep the existing id and creation time, and the player's own images (placeholders are replaced by the current ones).
   const base = <T extends Entity & { photos?: string[] }>(x: T): T => {
     const old = keep.get(x.id);
     if (!old) return x;
-    const photos = x.photos && x.photos.length === 0 && old.photos?.length ? old.photos : x.photos;
+    const ownImage = old.photos?.length && !isPlaceholderArt(old.photos[0]);
+    const photos = ownImage ? old.photos : x.photos;
     return { ...x, id: old.id, createdAt: old.createdAt, ...(x.photos ? { photos } : {}) };
   };
 

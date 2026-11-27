@@ -32,12 +32,18 @@ export function TileImportDialog({ ownerId, tiles, onClose }: { ownerId: string;
     if (folder && !collection) setCollection(folder);
   };
 
-  const existingCodes = tiles.map((t) => t.code.trim());
+  // Tiles created by this import must not count as "existing": they would clash with themselves
+  // and shift the automatic codes while the import runs.
+  const importedIds = useRef(new Set<string>());
+  const existing = tiles.filter((t) => !importedIds.current.has(t.id));
+  const existingCodes = existing.map((t) => t.code.trim());
   const plan = useMemo(() => planImport(files.map((f) => f.name), style, existingCodes), [style, files, tiles]); // eslint-disable-line react-hooks/exhaustive-deps
   const fromName = style === 'prefix' || style === 'suffix';
   const missing = plan.filter((p) => !p.code).length;
-  // Codes already used by a tile, or used twice in this import.
-  const clashes = [...new Set(plan.map((p) => p.code).filter((c, i, all) => c && (existingCodes.includes(c) || all.indexOf(c) !== i)))];
+  // Codes used twice within this import, and codes an existing tile already has.
+  const twice = [...new Set(plan.map((p) => p.code).filter((c, i, all) => c && all.indexOf(c) !== i))];
+  const takenBy = new Map(plan.flatMap((p) => existing.filter((t) => p.code && t.code.trim() === p.code).map((t) => [p.code, t] as const)));
+  const clash = (code: string) => twice.includes(code) || takenBy.has(code);
   const collections = [...new Set(tiles.map((t) => (t.collection ?? '').trim()).filter(Boolean))].sort();
 
   const run = async () => {
@@ -58,6 +64,7 @@ export function TileImportDialog({ ownerId, tiles, onClose }: { ownerId: string;
           markers: [],
           rules: '',
         };
+        importedIds.current.add(tile.id);
         await repos.mapTiles.put(tile);
         setProgress(i + 1);
       }
@@ -87,6 +94,14 @@ export function TileImportDialog({ ownerId, tiles, onClose }: { ownerId: string;
           </label>
         </div>
         {error && <p className="error">{error}</p>}
+        <TextField
+          label="Collection for all imported tiles"
+          help="tileCollection"
+          value={collection}
+          onChange={setCollection}
+          suggestions={collections}
+          placeholder={canPickFolder ? 'Optional – the folder name is used if left empty' : 'Optional'}
+        />
         {files.length > 0 && (
           <>
             <fieldset className="code-style">
@@ -106,11 +121,10 @@ export function TileImportDialog({ ownerId, tiles, onClose }: { ownerId: string;
               {!fromName && tiles.length > 0 && <small className="muted">Codes continue after your existing tiles.</small>}
               {fromName && <small className="muted">The code is the first or last part of the file name, separated by _, - or a space.</small>}
             </fieldset>
-            <TextField label="Collection" help="tileCollection" value={collection} onChange={setCollection} suggestions={collections} placeholder="Optional" />
             <ol className="import-preview" aria-label="Tiles to import">
               {files.map((f, i) => (
                 <li key={f.name + i}>
-                  <b className={plan[i].code ? '' : 'no-code'}>{plan[i].code || '?'}</b> {plan[i].name}
+                  <b className={!plan[i].code || clash(plan[i].code) ? 'no-code' : ''}>{plan[i].code || '?'}</b> {plan[i].name}
                 </li>
               ))}
             </ol>
@@ -119,7 +133,20 @@ export function TileImportDialog({ ownerId, tiles, onClose }: { ownerId: string;
                 ⚠ {missing === 1 ? '1 file has' : `${missing} files have`} no code in the name (marked ?). {missing === 1 ? 'Its' : 'Their'} code stays empty; you can add it in the tile editor.
               </p>
             )}
-            {clashes.length > 0 && <p className="warning">⚠ {clashes.length === 1 ? `Code ${clashes[0]} is` : `Codes ${clashes.join(', ')} are`} used more than once. Tiles can still be imported, but instructions like “tile {clashes[0]}” would be unclear.</p>}
+            {!busy && twice.length > 0 && (
+              <p className="warning">
+                ⚠ {twice.length === 1 ? `Code ${twice[0]} appears` : `Codes ${twice.join(', ')} appear`} more than once in these files.
+              </p>
+            )}
+            {!busy && takenBy.size > 0 && (
+              <p className="warning">
+                ⚠ Already used by your tiles:{' '}
+                {[...takenBy.values()].map((t) => `${t.code} (${t.name}${t.collection ? `, ${t.collection}` : ''})`).join('; ')}.
+              </p>
+            )}
+            {!busy && (twice.length > 0 || takenBy.size > 0) && (
+              <p className="muted small">The tiles can still be imported, but instructions like “tile {twice[0] ?? [...takenBy.keys()][0]}” would be unclear.</p>
+            )}
           </>
         )}
         <div className="row gap wrap">
