@@ -94,7 +94,7 @@ export function UnitsPage() {
   const abilities = useCollection(repos.abilities);
   return (
     <CrudPage
-      title="Units"
+      title="Enemies"
       intro="Your enemy units. Point values are calculated from stats and abilities."
       groups={{ label: 'faction', get: (u) => u.faction ?? '', emptyLabel: 'No faction' }}
       repo={repos.units}

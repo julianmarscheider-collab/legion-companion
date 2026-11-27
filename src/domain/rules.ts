@@ -16,7 +16,7 @@ export const RULES = {
   faction: {
     section: 'Unit stats',
     title: 'Faction',
-    text: 'Groups units, e.g. Goblins or Undead. Filter the Units list by faction, and pick a whole faction instead of an enemy list when starting a game.',
+    text: 'Groups units, e.g. Goblins or Undead. Filter the Enemies list by faction, and pick a whole faction instead of an enemy list when starting a game.',
   },
   points: {
     section: 'Unit stats',
@@ -59,12 +59,12 @@ export const RULES = {
   toughness: {
     section: 'Unit stats',
     title: 'Toughness',
-    text: 'Damage needed to kill one miniature of this unit.',
+    text: 'Damage a hero must deal in a single attack to remove one wound from one miniature of this type (with 1 wound: to kill it). Damage that doesn’t remove a wound or kill is discarded after the attack: enemies only keep track of lost wounds.',
   },
   wounds: {
     section: 'Unit stats',
     title: 'Wounds',
-    text: 'How many wounds the unit has. Each wound takes Toughness damage to remove; the unit dies when all are gone. Shown as “(×2)” after Toughness when above 1.',
+    text: 'How many wounds the unit has. An attack that deals at least Toughness damage removes a wound; the unit dies when all are gone. Lost wounds are the only damage tracked on enemies: any other damage is discarded after the attack. Shown as “(×2)” after Toughness when above 1.',
   },
   abilities: {
     section: 'Unit stats',
@@ -173,9 +173,9 @@ export const RULES = {
   // ---- Enemy lists ----
   enemyListUnits: {
     section: 'Enemy lists',
-    title: 'Units that can spawn',
+    title: 'Enemies that can spawn',
     text: 'Only these units can spawn in a game that uses this enemy list.',
-    link: { to: '/units', label: 'Open units' },
+    link: { to: '/enemies', label: 'Open enemies' },
   },
 
   // ---- Objectives & missions ----

@@ -16,16 +16,16 @@ export function buildSampleData(ownerId: string): SampleData {
   const e = () => newEntity(ownerId);
 
   const ability = (name: string, description: string, points: number): Ability => ({ ...e(), name, description, points });
-  const ranged = ability('Ranged', 'Can attack a hero up to 6" away instead of moving.', 4);
+  const ranged = ability('Ranged', 'Can attack a hero up to 2 spaces away instead of moving.', 4);
   const poison = ability('Poisonous', 'A hero damaged by this unit takes 1 extra damage at the start of their next turn.', 3);
-  const regen = ability('Regeneration', 'Heals 1 damage at the start of each of its activations.', 6);
+  const regen = ability('Regeneration', 'Heals one wound at the start of each of its activations.', 6);
   const leader = ability('Leader', 'Other enemies on the same tile get +1 Strength.', 5);
   // Boss deck cards for the Goblin Warlord (abilities ticked as boss cards).
   const bossCard = (name: string, description: string): Ability => ({ ...e(), name, description, points: 0, bossCard: true, collection: 'Goblin Warlord' });
   const crush = bossCard('Crushing Blow', 'The Warlord moves towards the nearest hero and attacks them twice.');
   const warCry = bossCard('War Cry', 'Activate all other enemies on the Warlord’s tile. They get +1 Strength this activation.');
-  const horde = bossCard('Call the Horde', 'Spawn 3 Goblins on the Warlord’s tile (if miniatures are free).');
-  const charge = bossCard('Brutal Charge', 'The Warlord moves 2 extra movement dice towards the farthest hero and attacks them.');
+  const horde = bossCard('Call the Horde', 'Spawn 3 Goblins on the Warlord’s tile. If there are no more Goblins available to spawn, move the closest three into the same space as the Warlord.');
+  const charge = bossCard('Brutal Charge', 'The Warlord moves towards the farthest hero with an extra 2 movement dice.');
   const abilities = [ranged, poison, regen, leader, crush, warCry, horde, charge];
 
   const unit = (name: string, over: Partial<Unit>): Unit => ({

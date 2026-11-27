@@ -99,7 +99,7 @@ function EnemyListEditor({ value: l, onChange }: EditorProps<EnemyList>) {
       <TextField label="Name" value={l.name} onChange={(name) => onChange({ ...l, name })} />
       <TextArea label="Description" value={l.description} onChange={(description) => onChange({ ...l, description })} />
       <PickList
-        label="Units that can spawn"
+        label="Enemies that can spawn"
         help="enemyListUnits"
         items={units}
         selected={l.unitIds}
@@ -109,7 +109,7 @@ function EnemyListEditor({ value: l, onChange }: EditorProps<EnemyList>) {
             <MiniCount count={u.count} /> ({unitPoints(u, abilities)} pts)
           </>
         )}
-        noItemsText="Create units first."
+        noItemsText="Create enemies first."
       />
       {factionsOf(units).length > 0 && (
         <Dropdown
@@ -252,7 +252,7 @@ function ObjectiveEditor({ value: o, onChange }: EditorProps<Objective>) {
           onChange={(defeatBossId) => onChange({ ...o, defeatBossId })}
           options={[{ value: '', label: '— not linked to a boss —' }, ...bosses.map((u) => ({ value: u.id, label: u.name }))]}
         />
-        {bosses.length === 0 && <small className="muted">Mark a unit as Boss under Units to use these.</small>}
+        {bosses.length === 0 && <small className="muted">Mark an enemy as Boss under Enemies to use these.</small>}
       </fieldset>
       <TextArea label="Notes" value={o.description} onChange={(description) => onChange({ ...o, description })} />
     </div>
@@ -276,7 +276,7 @@ export function ObjectivesPage() {
           <small className="muted unit-meta">
             {o.questline && <i className="faction">{o.questline}</i>}
             <span>On: {placementLabel(o)}</span>
-            {o.isStart === false && o.revealedBy && <span>🔒 after “{objectiveNames.get(o.revealedBy) ?? '?'}”</span>}
+            {o.isStart === false && o.revealedBy && <span>🔒 locked behind “{objectiveNames.get(o.revealedBy) ?? '?'}”</span>}
             {o.summonBossId && (
               <span className="with-icon">
                 <CrownIcon /> summons a boss

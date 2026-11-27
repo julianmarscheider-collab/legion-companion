@@ -24,7 +24,7 @@ function Layout() {
             ▶ Play
           </NavLink>
           {NAV_GROUPS.map((g) => (
-            <div key={g.title} className="nav-box wide-only" role="group" aria-label={g.title}>
+            <div key={g.title} className={`nav-box wide-only tone-${g.tone}`} role="group" aria-label={g.title}>
               {g.items.map((i) => (
                 <NavLink key={i.to} to={i.to}>
                   {i.label}
@@ -51,7 +51,7 @@ const router = createHashRouter([
     element: <Layout />,
     children: [
       { path: '/', element: <HomePage /> },
-      { path: '/units', element: <UnitsPage /> },
+      { path: '/enemies', element: <UnitsPage /> },
       { path: '/abilities', element: <AbilitiesPage /> },
       { path: '/enemy-lists', element: <EnemyListsPage /> },
       { path: '/objectives', element: <ObjectivesPage /> },
