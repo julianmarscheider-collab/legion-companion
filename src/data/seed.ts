@@ -18,7 +18,12 @@ export function buildSampleData(ownerId: string): SampleData {
 
   const ability = (name: string, description: string, points: number): Ability => ({ ...e(), name, description, points });
   const ranged = ability('Ranged', 'Can attack a hero up to 2 spaces away instead of moving.', 4);
-  const poison = ability('Poisonous', 'A hero damaged by this unit takes 1 extra damage at the start of their next turn.', 3);
+  // Variable cost: worth more on units that attack often and hit hard.
+  const poison: Ability = {
+    ...ability('Poisonous', 'A hero damaged by this unit takes 1 extra damage at the start of their next turn.', 0),
+    costType: 'dependent',
+    dependsOn: [{ stat: 'attacks', factor: 2 }, { stat: 'strength', factor: 1.5 }],
+  };
   const regen = ability('Regeneration', 'Heals one wound at the start of each of its activations.', 6);
   const leader = ability('Leader', 'Other enemies on the same tile get +1 Strength.', 5);
   // Boss deck cards for the Goblin Warlord (abilities ticked as boss cards).
@@ -185,7 +190,12 @@ export async function restoreSampleData(ownerId: string): Promise<{ updated: num
 
   await saveAll({
     abilities: ex.abilities.map(base),
-    units: ex.units.map((u) => ({ ...base(u), abilityIds: ids(u.abilityIds), spawn: { ...u.spawn, groupedWith: ids(u.spawn.groupedWith) } })),
+    units: ex.units.map((u) => ({
+      ...base(u),
+      abilityIds: ids(u.abilityIds),
+      spawn: { ...u.spawn, groupedWith: ids(u.spawn.groupedWith) },
+      ...(u.bossDeck ? { bossDeck: u.bossDeck.map((c) => ({ ...c, abilityId: id(c.abilityId) })) } : {}),
+    })),
     tiles: ex.tiles.map(base),
     objectives: ex.objectives.map((o) => ({ ...base(o), ...(o.revealedBy ? { revealedBy: id(o.revealedBy) } : {}) })),
     missions: ex.missions.map((m) => ({ ...base(m), objectiveIds: ids(m.objectiveIds) })),
